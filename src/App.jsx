@@ -3,24 +3,23 @@ import Welcome from "./Welcome";
 import Login from "./Login";
 import Register from "./Register";
 import Dashboard from "./Dashboard"; 
-import Profile from "./Profile"; // 👈 Ensure this path matches your folder structure
+import Profile from "./Profile";
+import MyCommitments from "./MyCommitments";
+import ActiveRequests from "./ActiveRequests"; // 👈 1. Import the new page
 
 function App() {
   return (
     <Router>
       <Routes>
-        {/* Default Landing Page */}
         <Route path="/" element={<Welcome />} />
-
-        {/* Auth Pages (SDD Requirement 1.3) */}
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
-
-        {/* Core User Dashboards (SDD Requirement 2.3) */}
         <Route path="/dashboard" element={<Dashboard />} />
-        
-        {/* Profile & Eligibility Tracker (SDD Requirement 2.4) */}
         <Route path="/profile" element={<Profile />} />
+        <Route path="/commitments" element={<MyCommitments />} /> 
+
+        {/* 👈 2. Add the Active Requests Route */}
+        <Route path="/requests" element={<ActiveRequests />} />
       </Routes>
     </Router>
   );
