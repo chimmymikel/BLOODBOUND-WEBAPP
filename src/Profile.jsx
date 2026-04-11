@@ -250,9 +250,10 @@ export default function Profile() {
   const themeBorderLight = isDonor ? "#ffe4e6" : "#dbeafe";
   const activeNavColor   = themeAccent;
 
+  // CHANGED: Added Request History for non-donors
   const navItems = isDonor
     ? ["Overview", "My Commitments", "Active Requests", "My Profile"]
-    : ["Overview", "Active Requests", "My Profile"];
+    : ["Overview", "Active Requests", "Request History", "My Profile"];
 
   const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || "U")}&background=${isDonor ? "DC2626" : "1D4ED8"}&color=fff&size=128`;
 
@@ -395,11 +396,13 @@ export default function Profile() {
     }
   };
 
+  // CHANGED: Added Request History route handler
   const handleNavClick = (item) => {
     setSidebarOpen(false);
     if (item === "Overview")             navigate("/dashboard",   { state: { user } });
     else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
     else if (item === "Active Requests") navigate("/requests",    { state: { user } });
+    else if (item === "Request History") navigate("/history",     { state: { user } });
     // "My Profile" = already here, do nothing
   };
 

@@ -5,7 +5,8 @@ import Register from "./Register";
 import Dashboard from "./Dashboard"; 
 import Profile from "./Profile";
 import MyCommitments from "./MyCommitments";
-import ActiveRequests from "./ActiveRequests"; // 👈 1. Import the new page
+import ActiveRequests from "./ActiveRequests";
+import RequestHistory from "./RequestHistory"; // 👈 1. Import the new history page
 
 function App() {
   return (
@@ -17,9 +18,10 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/commitments" element={<MyCommitments />} /> 
-
-        {/* 👈 2. Add the Active Requests Route */}
         <Route path="/requests" element={<ActiveRequests />} />
+
+        {/* 👈 2. Add the Request History Route */}
+        <Route path="/history" element={<RequestHistory />} />
       </Routes>
     </Router>
   );

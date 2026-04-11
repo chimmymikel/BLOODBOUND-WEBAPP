@@ -297,7 +297,7 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
   };
 
   const hoverTitle = isBlockedByOtherCommitment 
-    ? "You already have committed. Cancel or complete it first." 
+    ? "You already have an active commitment. Cancel or complete it first." 
     : (!eligible && !alreadyCommitted) 
     ? `Wait ${daysLeft} days to be eligible.` 
     : "";
@@ -543,14 +543,17 @@ export default function Dashboard() {
   const [activeTab,  setActiveTab]  = useState("Overview");
   const [hoveredTab, setHoveredTab] = useState(null);
 
+  // CHANGED: Added Request History to the Requester's navigation array!
   const navItems = isDonor
     ? ["Overview", "My Commitments", "Active Requests", "My Profile"]
-    : ["Overview", "Active Requests", "My Profile"];
+    : ["Overview", "Active Requests", "Request History", "My Profile"];
 
+  // CHANGED: Added Request History navigation routing!
   const handleNavClick = (item) => {
     if (item === "Overview")             navigate("/dashboard",   { state: { user } });
     else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
     else if (item === "Active Requests") navigate("/requests",    { state: { user } });
+    else if (item === "Request History") navigate("/history",     { state: { user } });
     else if (item === "My Profile")      navigate("/profile",     { state: { user } });
   };
 
@@ -941,7 +944,7 @@ export default function Dashboard() {
             <div className="db-f4">
               <SectionCard>
                 <SectionHeader
-                  title="Your Active Requests"
+                  title="Your Requests"
                   subtitle="Monitor donor commitments and mark fulfilled"
                   right={<button onClick={fetchRequests} style={{ background: "none", border: "2px solid #e2e8f0", borderRadius: "10px", padding: "6px 14px", fontSize: "13px", fontWeight: "700", cursor: "pointer", color: "#64748b", fontFamily: "inherit" }}>↻ Refresh</button>}
                 />

@@ -230,7 +230,6 @@ export default function Register() {
     confirmPassword: "",
     bloodType: "O_POSITIVE",
     role: "",
-    hospitalOrOrg: "",
     contactNumber: "",
   });
   const [error, setError] = useState("");
@@ -258,7 +257,6 @@ export default function Register() {
       email: formData.email.trim(),
       password: formData.password.trim(),
       confirmPassword: formData.confirmPassword.trim(),
-      hospitalOrOrg: formData.hospitalOrOrg.trim(),
       contactNumber: formData.contactNumber.trim(),
     };
 
@@ -293,11 +291,10 @@ export default function Register() {
         role: t.role,
         contactNumber: cleanedNum,
         ...(t.role === "DONOR" && { bloodType: t.bloodType }),
-        ...(t.role === "REQUESTER" && { hospitalOrOrg: t.hospitalOrOrg }),
       };
       const response = await api.post("/auth/register", payload);
       if (response.data.success) {
-        // ✅ Save token then navigate
+        // Save token then navigate
         const { token, ...user } = response.data.data;
         localStorage.setItem("token", token);
         navigate("/dashboard", { state: { user } });
@@ -529,18 +526,6 @@ export default function Register() {
                   ["AB_POSITIVE","AB+"],["AB_NEGATIVE","AB−"],
                 ].map(([val,lbl])=>(<option key={val} value={val}>{lbl}</option>))}
               </select>
-            </div>
-          )}
-
-          {!isDonor && (
-            <div className="rf3">
-              <label style={labelStyle}>Hospital / Organization</label>
-              <input
-                type="text" name="hospitalOrOrg" placeholder="e.g. Cebu Doctors' Hospital"
-                value={formData.hospitalOrOrg} onChange={handleChange}
-                onFocus={()=>setFocused("hospitalOrOrg")} onBlur={()=>setFocused(null)}
-                style={inputStyle("hospitalOrOrg")}
-              />
             </div>
           )}
 

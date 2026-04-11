@@ -5,7 +5,9 @@ import {
   getRequests,
   getCommitments,
   createCommitment,
+  createRequest,
   fulfillRequest,
+  getHospitals,
 } from "./api";
 
 const STYLES = `
@@ -33,6 +35,14 @@ const STYLES = `
     50%     { transform: translate(-15px,10px) scale(1.04); }
   }
   @keyframes spin { to { transform: rotate(360deg); } }
+  @keyframes modalFadeIn {
+    from { opacity: 0; transform: scale(0.96) translateY(10px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+  }
+  @keyframes overlayFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
   @keyframes toastSlideUp {
     from { opacity: 0; transform: translate(-50%, 20px); }
     to   { opacity: 1; transform: translate(-50%, 0); }
@@ -72,6 +82,15 @@ const STYLES = `
     background: #fff1f2; border-color: #fecdd3; color: #be123c;
     transform: translateY(-1px); box-shadow: 0 4px 12px rgba(220,38,38,0.08);
   }
+
+  .cta-btn {
+    background: #ffffff; border: none; border-radius: 12px;
+    padding: 14px 28px; font-weight: 900; font-size: 15px; cursor: pointer;
+    font-family: inherit; flex-shrink: 0; box-shadow: 0 4px 14px rgba(0,0,0,0.15);
+    transition: all 0.22s cubic-bezier(.16,1,.3,1); letter-spacing: -0.01em;
+  }
+  .cta-btn:hover { transform: translateY(-2px) scale(1.02); box-shadow: 0 10px 24px rgba(0,0,0,0.18); }
+  .cta-btn:active { transform: scale(0.98); }
 
   .request-row {
     border: 2px solid #f1f5f9; border-radius: 14px; padding: 20px 24px;
@@ -114,6 +133,35 @@ const STYLES = `
     padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 800;
     cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent;
     font-family: inherit;
+  }
+
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 1000;
+    background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+    padding: 24px; animation: overlayFadeIn 0.2s ease;
+  }
+  .modal-box {
+    background: #ffffff; border-radius: 24px; width: 100%; max-width: 520px;
+    box-shadow: 0 32px 80px -8px rgba(0,0,0,0.28);
+    animation: modalFadeIn 0.25s cubic-bezier(.16,1,.3,1);
+    max-height: 90vh; overflow-y: auto;
+  }
+  .modal-input {
+    width: 100%; padding: 11px 14px; border-radius: 10px;
+    border: 2px solid #e2e8f0; font-size: 14px; font-family: inherit;
+    outline: none; color: #0f172a; background: #f8fafc;
+    transition: border-color 0.18s, background 0.18s; box-sizing: border-box;
+  }
+  .modal-input:focus { border-color: #1D4ED8; background: #f8fbff; }
+  .modal-label {
+    display: block; font-size: 11px; font-weight: 800; color: #64748b;
+    text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 7px;
+  }
+  .urgency-btn {
+    flex: 1; padding: 10px 8px; border-radius: 10px; border: 2px solid #e2e8f0;
+    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+    transition: all 0.18s ease; background: #f8fafc; color: #64748b;
   }
 `;
 
@@ -188,31 +236,39 @@ function SectionCard({ children, style = {} }) {
 }
 
 // ── DONOR: single request row ─────────────────────────────────────────────────
-function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onCommit, committing }) {
+function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onCommit, committing, hasAnyActiveCommitment }) {
   const bt = formatBloodType(request.bloodType);
   const urgencyColor =
     request.urgency === "CRITICAL" ? "#DC2626"
     : request.urgency === "HIGH"   ? "#EA580C"
     : "#16A34A";
 
-  const isDisabled = alreadyCommitted || committing || !eligible;
+  const isBlockedByOtherCommitment = !alreadyCommitted && hasAnyActiveCommitment;
+  const isDisabled = alreadyCommitted || committing || !eligible || isBlockedByOtherCommitment;
 
   const btnLabel = committing        ? "..."
     : alreadyCommitted               ? "✔ Committed"
     : !eligible                      ? `⏳ ${daysLeft}d left`
+    : isBlockedByOtherCommitment     ? "Unavailable"
     : "Commit to Donate";
 
   const btnStyle = {
     background: alreadyCommitted  ? "linear-gradient(135deg,#ecfdf5,#d1fae5)"
-      : !eligible                 ? "linear-gradient(135deg,#f1f5f9,#e2e8f0)"
+      : (!eligible || isBlockedByOtherCommitment) ? "linear-gradient(135deg,#f1f5f9,#e2e8f0)"
       : "linear-gradient(135deg,#E63946,#DC2626)",
     color: alreadyCommitted       ? "#065f46"
-      : !eligible                 ? "#94a3b8"
+      : (!eligible || isBlockedByOtherCommitment) ? "#94a3b8"
       : "#ffffff",
     border: alreadyCommitted      ? "1.5px solid #6ee7b7"
-      : !eligible                 ? "1.5px solid #cbd5e1"
+      : (!eligible || isBlockedByOtherCommitment) ? "1.5px solid #cbd5e1"
       : "none",
   };
+
+  const hoverTitle = isBlockedByOtherCommitment 
+    ? "You already have an active commitment. Cancel or complete it first." 
+    : (!eligible && !alreadyCommitted) 
+    ? `Wait ${daysLeft} days to be eligible.` 
+    : "";
 
   return (
     <div className="request-row" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -234,7 +290,7 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
           Posted {timeAgo(request.createdAt)}{request.location ? ` · ${request.location}` : ""}
         </div>
       </div>
-      <button className="commit-btn" disabled={isDisabled} onClick={() => !isDisabled && onCommit(request.id)} style={btnStyle}>
+      <button className="commit-btn" disabled={isDisabled} onClick={() => !isDisabled && onCommit(request.id)} style={btnStyle} title={hoverTitle}>
         {btnLabel}
       </button>
     </div>
@@ -249,6 +305,10 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
     : request.status === "ACTIVE"   ? "#DC2626"
     : "#64748b";
   const isConfirming = confirmingId === request.id;
+
+  const commitCount = request.commitmentCount || 0;
+  const unitsNeeded = request.units || 1;
+  const hasEnoughDonors = commitCount >= unitsNeeded;
 
   return (
     <div className="request-row" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -271,8 +331,8 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", flexShrink: 0 }}>
         <div style={{ textAlign: "center", padding: "8px 16px", background: "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: "2px solid #e2e8f0", borderRadius: "10px" }}>
-          <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{request.commitmentCount ?? 0}</div>
-          <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donor{request.commitmentCount !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{commitCount}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donor{commitCount !== 1 ? "s" : ""}</div>
         </div>
 
         {!isFulfilled ? (
@@ -289,7 +349,12 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
               </div>
             </div>
           ) : (
-            <button className="fulfill-btn" disabled={fulfilling} onClick={() => onStartConfirm(request.id)}>
+            <button 
+              className="fulfill-btn" 
+              disabled={fulfilling || !hasEnoughDonors} 
+              onClick={() => onStartConfirm(request.id)}
+              title={!hasEnoughDonors ? `Wait for ${unitsNeeded} donor(s) to commit before fulfilling` : ""}
+            >
               ✔ Mark Fulfilled
             </button>
           )
@@ -298,6 +363,97 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
             ✔ Fulfilled
           </span>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ── Post Request Modal ────────────────────────────────────────────────────────
+function PostRequestModal({ onClose, onSubmit, submitting, error }) {
+  const [form, setForm] = useState({
+    bloodType:  "O_POSITIVE",
+    units:      1,
+    urgency:    "STANDARD",
+    notes:      "",
+    location:   "Cebu City",
+    hospitalId: null,
+  });
+  const [hospitals,        setHospitals]        = useState([]);
+  const [loadingHospitals, setLoadingHospitals] = useState(true);
+
+  useEffect(() => {
+    getHospitals()
+      .then((res) => {
+        const data = res.data?.data || [];
+        setHospitals(data);
+        if (data.length > 0) setForm((prev) => ({ ...prev, hospitalId: data[0].id }));
+      })
+      .catch((err) => console.error("Error fetching hospitals:", err))
+      .finally(() => setLoadingHospitals(false));
+  }, []);
+
+  const bloodTypes = [
+    ["O_POSITIVE","O+"],["O_NEGATIVE","O−"],
+    ["A_POSITIVE","A+"],["A_NEGATIVE","A−"],
+    ["B_POSITIVE","B+"],["B_NEGATIVE","B−"],
+    ["AB_POSITIVE","AB+"],["AB_NEGATIVE","AB−"],
+  ];
+  const urgencies = [
+    { key: "STANDARD", label: "Standard", color: "#16A34A", bg: "#ecfdf5", border: "#6ee7b7" },
+    { key: "HIGH",     label: "High",     color: "#EA580C", bg: "#fff7ed", border: "#fdba74" },
+    { key: "CRITICAL", label: "Critical", color: "#DC2626", bg: "#fff1f2", border: "#fecdd3" },
+  ];
+
+  return (
+    <div className="modal-overlay" onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div className="modal-box">
+        <div style={{ padding: "28px 32px 0", display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+          <div>
+            <h2 style={{ margin: "0 0 4px", fontSize: "22px", fontWeight: "900", color: "#0f172a", letterSpacing: "-0.02em" }}>Post Blood Request 🩸</h2>
+            <p style={{ margin: 0, fontSize: "13px", color: "#64748b", fontWeight: "500" }}>Notify available donors in Cebu City.</p>
+          </div>
+          <button onClick={onClose} style={{ background: "#f1f5f9", border: "none", borderRadius: "8px", width: "32px", height: "32px", cursor: "pointer", fontSize: "16px", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>✕</button>
+        </div>
+        <div style={{ padding: "24px 32px 32px", display: "flex", flexDirection: "column", gap: "20px" }}>
+          <div>
+            <label className="modal-label">Blood Type Needed</label>
+            <select className="modal-input" value={form.bloodType} onChange={(e) => setForm({ ...form, bloodType: e.target.value })}>
+              {bloodTypes.map(([val, lbl]) => <option key={val} value={val}>{lbl}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="modal-label">Units Needed</label>
+            <input type="number" min="1" max="20" className="modal-input" value={form.units} onChange={(e) => setForm({ ...form, units: Math.max(1, parseInt(e.target.value) || 1) })} />
+          </div>
+          <div>
+            <label className="modal-label">Urgency Level</label>
+            <div style={{ display: "flex", gap: "10px" }}>
+              {urgencies.map((u) => (
+                <button key={u.key} type="button" className="urgency-btn" onClick={() => setForm({ ...form, urgency: u.key })}
+                  style={{ background: form.urgency === u.key ? u.bg : "#f8fafc", borderColor: form.urgency === u.key ? u.border : "#e2e8f0", color: form.urgency === u.key ? u.color : "#64748b", transform: form.urgency === u.key ? "translateY(-1px)" : "none", boxShadow: form.urgency === u.key ? `0 4px 12px ${u.color}22` : "none" }}>
+                  {u.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div>
+            <label className="modal-label">Hospital</label>
+            <select className="modal-input" value={form.hospitalId ?? ""} onChange={(e) => setForm({ ...form, hospitalId: Number(e.target.value) })} disabled={loadingHospitals}>
+              {loadingHospitals ? <option>Loading hospitals...</option> : hospitals.map((h) => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="modal-label">Additional Notes <span style={{ fontWeight: "500", textTransform: "none", letterSpacing: 0, color: "#94a3b8" }}>(optional)</span></label>
+            <textarea className="modal-input" placeholder="e.g. For post-op patient, Room 412" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} rows={3} style={{ resize: "vertical", paddingTop: "10px", lineHeight: "1.5" }} />
+          </div>
+          {error && <div style={{ backgroundColor: "#fff1f2", border: "2px solid #fecdd3", borderRadius: "10px", padding: "12px 16px", fontSize: "13px", fontWeight: "700", color: "#be123c" }}>⚠ {error}</div>}
+          <div style={{ display: "flex", gap: "12px", marginTop: "4px" }}>
+            <button onClick={onClose} style={{ flex: 1, padding: "13px", borderRadius: "12px", border: "2px solid #e2e8f0", background: "#f8fafc", color: "#64748b", fontWeight: "800", fontSize: "14px", cursor: "pointer", fontFamily: "inherit", transition: "all 0.18s" }} onMouseEnter={(e) => (e.currentTarget.style.background = "#f1f5f9")} onMouseLeave={(e) => (e.currentTarget.style.background = "#f8fafc")}>Cancel</button>
+            <button onClick={() => onSubmit(form)} disabled={submitting} style={{ flex: 2, padding: "13px", borderRadius: "12px", border: "none", background: submitting ? "#cbd5e1" : "linear-gradient(135deg,#2563EB 0%,#1D4ED8 50%,#1E40AF 100%)", color: "#fff", fontWeight: "900", fontSize: "14px", cursor: submitting ? "not-allowed" : "pointer", fontFamily: "inherit", transition: "all 0.18s", boxShadow: submitting ? "none" : "0 6px 20px rgba(37,99,235,0.3)", display: "flex", alignItems: "center", justifyContent: "center", gap: "8px" }}>
+              {submitting ? (<><span style={{ width: "14px", height: "14px", border: "2.5px solid rgba(255,255,255,.3)", borderTopColor: "#fff", borderRadius: "50%", display: "inline-block", animation: "spin .7s linear infinite" }} />Posting...</>) : "Post Request →"}
+            </button>
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -348,6 +504,9 @@ export default function ActiveRequests() {
   const activeNavColor = isDonor ? "#DC2626" : "#1D4ED8";
   const themeBgLight   = isDonor ? "#fff1f2" : "#eff6ff";
   const themeBorder    = isDonor ? "#fecdd3" : "#bfdbfe";
+  const accentGrad      = isDonor
+    ? "linear-gradient(135deg,#E63946 0%,#DC2626 50%,#B91C1C 100%)"
+    : "linear-gradient(135deg,#2563EB 0%,#1D4ED8 50%,#1E40AF 100%)";
 
   const [toastMessage, setToastMessage] = useState({ text: "", success: true });
   const showToast = (text, success = true) => {
@@ -356,14 +515,16 @@ export default function ActiveRequests() {
   };
 
   const [hoveredTab, setHoveredTab] = useState(null);
+
   const navItems = isDonor
     ? ["Overview", "My Commitments", "Active Requests", "My Profile"]
-    : ["Overview", "Active Requests", "My Profile"];
+    : ["Overview", "Active Requests", "Request History", "My Profile"];
 
   const handleNavClick = (item) => {
-    if (item === "Overview")            navigate("/dashboard",   { state: { user } });
-    else if (item === "My Commitments") navigate("/commitments", { state: { user } });
-    else if (item === "My Profile")     navigate("/profile",     { state: { user } });
+    if (item === "Overview")             navigate("/dashboard",   { state: { user } });
+    else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
+    else if (item === "Request History") navigate("/history",     { state: { user } });
+    else if (item === "My Profile")      navigate("/profile",     { state: { user } });
     // Active Requests does nothing — already here
   };
 
@@ -376,6 +537,10 @@ export default function ActiveRequests() {
   const [committingId, setCommittingId] = useState(null);
   const [fulfillingId, setFulfillingId] = useState(null);
   const [confirmingId, setConfirmingId] = useState(null);
+
+  const [showModal,   setShowModal]   = useState(false);
+  const [submitting,  setSubmitting]  = useState(false);
+  const [submitError, setSubmitError] = useState("");
 
   const fetchRequests = useCallback(async () => {
     if (!user.id) return;
@@ -412,16 +577,12 @@ export default function ActiveRequests() {
     }
   }, [user.id, isDonor]);
 
-  // ✅ FIXED: Only depend on user.id — not on the callback refs.
-  // Putting fetchRequests/fetchMyCommitments in the dep array caused them
-  // to re-run every render because useCallback recreates them on role/bloodType
-  // changes, triggering an infinite polling loop visible in backend logs.
   useEffect(() => {
     if (user.id) {
       fetchRequests();
       fetchMyCommitments();
     }
-  }, [user.id]); // ✅ user.id only — callbacks are called manually on refresh
+  }, [user.id]);
 
   const handleCommit = async (requestId) => {
     if (!user.id || !eligible) return;
@@ -457,6 +618,35 @@ export default function ActiveRequests() {
     }
   };
 
+  const handlePostRequest = async (form) => {
+    setSubmitting(true);
+    setSubmitError("");
+    try {
+      const payload = {
+        bloodType:   form.bloodType,
+        units:       form.units,
+        urgency:     form.urgency,
+        notes:       form.notes   || null,
+        location:    form.location || "Cebu City",
+        requesterId: user.id,
+        hospitalId:  Number(form.hospitalId),
+      };
+      const res = await createRequest(payload);
+      if (res.data?.success || res.status === 201 || res.status === 200) {
+        setShowModal(false);
+        setSubmitError("");
+        await fetchRequests(); 
+        showToast("Request successfully posted! 🩸", true);
+      } else {
+        setSubmitError(res.data?.message || "Failed to post request.");
+      }
+    } catch (err) {
+      setSubmitError(err.response?.data?.message || "Failed to post request. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
   const displayedRequests = requests.filter(r =>
     urgencyFilter === "ALL" ? true : r.urgency === urgencyFilter
   );
@@ -469,6 +659,9 @@ export default function ActiveRequests() {
         ? <EmptyState icon="🏥" title="No matching requests" body="There are currently no active requests matching your selected filter." />
         : <EmptyState icon="📋" title="No matching requests" body="You don't have any requests matching your selected filter." />;
     }
+
+    const hasAnyActiveCommitment = committedIds.size > 0;
+
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {isDonor
@@ -479,6 +672,7 @@ export default function ActiveRequests() {
                 eligible={eligible} daysLeft={daysLeft}
                 committing={committingId === r.id}
                 onCommit={handleCommit}
+                hasAnyActiveCommitment={hasAnyActiveCommitment}
               />
             ))
           : displayedRequests.map((r) => (
@@ -508,6 +702,15 @@ export default function ActiveRequests() {
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f8fafc", fontFamily: '"Inter",-apple-system,BlinkMacSystemFont,sans-serif' }}>
       <style>{STYLES}</style>
+
+      {showModal && !isDonor && (
+        <PostRequestModal
+          onClose={() => { setShowModal(false); setSubmitError(""); }}
+          onSubmit={handlePostRequest}
+          submitting={submitting}
+          error={submitError}
+        />
+      )}
 
       {/* ══ SIDEBAR ══ */}
       <aside style={{ width: "280px", background: "linear-gradient(145deg,#F8FAFC 0%,#EEF2FF 50%,#F1F5F9 100%)", borderRight: "2px solid #e2e8f0", padding: "40px 24px", position: "fixed", height: "100vh", display: "flex", flexDirection: "column", overflow: "hidden", boxSizing: "border-box" }}>
@@ -555,15 +758,28 @@ export default function ActiveRequests() {
       {/* ══ MAIN CONTENT ══ */}
       <main style={{ marginLeft: "280px", padding: "56px", width: "100%", boxSizing: "border-box", position: "relative" }}>
 
-        <header className="db-f1" style={{ marginBottom: "40px" }}>
-          <h1 style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-            Active Requests 🚨
-          </h1>
-          <p style={{ color: "#64748b", fontSize: "16px", margin: "0", fontWeight: "500" }}>
-            {isDonor
-              ? "Browse emergencies and active requests."
-              : "Manage your active blood postings and check donor commitments."}
-          </p>
+        {/* CHANGED: Replaced the old banner with a clean, header-aligned button */}
+        <header className="db-f1" style={{ marginBottom: "40px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
+          <div>
+            <h1 style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+              Active Requests 🚨
+            </h1>
+            <p style={{ color: "#64748b", fontSize: "16px", margin: "0", fontWeight: "500" }}>
+              {isDonor
+                ? "Browse emergencies and active requests."
+                : "Manage your active blood postings and check donor commitments."}
+            </p>
+          </div>
+          
+          {!isDonor && (
+            <button 
+              className="cta-btn" 
+              style={{ background: accentGrad, color: "#ffffff" }} 
+              onClick={() => { setSubmitError(""); setShowModal(true); }}
+            >
+              + Post Blood Request
+            </button>
+          )}
         </header>
 
         <div className="db-f2">
