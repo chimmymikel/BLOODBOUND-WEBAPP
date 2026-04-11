@@ -270,6 +270,14 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
     ? `Wait ${daysLeft} days to be eligible.` 
     : "";
 
+  const contactDisplay = alreadyCommitted 
+    ? (request.requester?.contactNumber || request.contactNumber || "Check 'My Commitments'")
+    : "Hidden until committed";
+    
+  const nameDisplay = alreadyCommitted 
+    ? (request.requester?.fullName || "Requester")
+    : "Anonymous";
+
   return (
     <div className="request-row" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
       <div style={{ width: "52px", height: "52px", flexShrink: 0, borderRadius: "14px", background: "linear-gradient(135deg,#fff1f2,#ffe4e6)", border: "2px solid #fecdd3", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: "900", color: "#DC2626" }}>
@@ -286,7 +294,24 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
           {request.units} unit{request.units !== 1 ? "s" : ""} needed
           {request.notes ? ` · ${request.notes}` : ""}
         </div>
-        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "3px", fontWeight: "500" }}>
+        
+        <div style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "8px" }}>
+          <span style={{ 
+            fontSize: "11px", fontWeight: "800", 
+            backgroundColor: alreadyCommitted ? "#ecfdf5" : "#f8fafc", 
+            color: alreadyCommitted ? "#065f46" : "#94a3b8", 
+            padding: "4px 8px", borderRadius: "6px", 
+            border: `1px solid ${alreadyCommitted ? "#a7f3d0" : "#e2e8f0"}`, 
+            display: "flex", alignItems: "center", gap: "4px" 
+          }}>
+            <span style={{ fontSize: "12px" }}>{alreadyCommitted ? "📞" : "🔒"}</span> {contactDisplay}
+          </span>
+          <span style={{ fontSize: "11px", fontWeight: "600", color: "#cbd5e1" }}>
+            👤 {nameDisplay}
+          </span>
+        </div>
+
+        <div style={{ fontSize: "11px", color: "#94a3b8", marginTop: "6px", fontWeight: "500" }}>
           Posted {timeAgo(request.createdAt)}{request.location ? ` · ${request.location}` : ""}
         </div>
       </div>
@@ -525,7 +550,6 @@ export default function ActiveRequests() {
     else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
     else if (item === "Request History") navigate("/history",     { state: { user } });
     else if (item === "My Profile")      navigate("/profile",     { state: { user } });
-    // Active Requests does nothing — already here
   };
 
   const [requests,        setRequests]        = useState([]);
@@ -573,7 +597,6 @@ export default function ActiveRequests() {
       const activeList = list.filter(c => c.status === "PENDING" || c.status === "COMPLETED");
       setCommittedIds(new Set(activeList.map((c) => c.requestId ?? c.request?.id)));
     } catch {
-      // Non-critical
     }
   }, [user.id, isDonor]);
 
@@ -758,7 +781,6 @@ export default function ActiveRequests() {
       {/* ══ MAIN CONTENT ══ */}
       <main style={{ marginLeft: "280px", padding: "56px", width: "100%", boxSizing: "border-box", position: "relative" }}>
 
-        {/* CHANGED: Replaced the old banner with a clean, header-aligned button */}
         <header className="db-f1" style={{ marginBottom: "40px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
           <div>
             <h1 style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
