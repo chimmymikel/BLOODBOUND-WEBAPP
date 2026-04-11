@@ -141,7 +141,7 @@ function TicketCard({ ticket, navigate, user, onCancel, cancelling }) {
 
   const statusColor = isPending   ? "#EA580C"
     : isCompleted                 ? "#16A34A"
-    : "#94a3b8"; // CANCELLED = grey
+    : "#94a3b8";
 
   const statusBg  = isPending   ? "#fff7ed"
     : isCompleted               ? "#ecfdf5"
@@ -159,7 +159,6 @@ function TicketCard({ ticket, navigate, user, onCancel, cancelling }) {
     ? new Date(ticket.committedAt).toLocaleDateString("en-PH", { month: "long", day: "numeric", year: "numeric" })
     : "—";
 
-  // ✅ ADDED: Two-step cancel confirm state
   const [confirmingCancel, setConfirmingCancel] = useState(false);
 
   return (
@@ -225,7 +224,6 @@ function TicketCard({ ticket, navigate, user, onCancel, cancelling }) {
                 📍 Get Directions
               </button>
 
-              {/* ✅ ADDED: Cancel commitment button with two-step confirm */}
               {!confirmingCancel ? (
                 <button
                   className="action-btn"
@@ -290,11 +288,9 @@ export default function MyCommitments() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ FIXED: user is now state so it survives page refresh
   const [user,        setUser]        = useState(location.state?.user || {});
   const [authLoading, setAuthLoading] = useState(!location.state?.user);
 
-  // ✅ FIXED: Auth fallback on page refresh
   useEffect(() => {
     if (!location.state?.user?.id) {
       const token = localStorage.getItem("token");
@@ -326,11 +322,11 @@ export default function MyCommitments() {
 
   const navItems = ["Overview", "My Commitments", "Active Requests", "My Profile"];
 
-  // ✅ FIXED: All nav items now work correctly
+  // ✅ FIXED: "Active Requests" now correctly navigates to /requests
   const handleNavClick = (item) => {
-    if (item === "Overview")            navigate("/dashboard",   { state: { user } });
-    else if (item === "Active Requests") navigate("/dashboard",  { state: { user } });
-    else if (item === "My Profile")     navigate("/profile",     { state: { user } });
+    if (item === "Overview")             navigate("/dashboard",   { state: { user } });
+    else if (item === "Active Requests") navigate("/requests",    { state: { user } }); // ✅ was "/dashboard"
+    else if (item === "My Profile")      navigate("/profile",     { state: { user } });
     // "My Commitments" = already here, do nothing
   };
 
@@ -352,12 +348,10 @@ export default function MyCommitments() {
     if (user.id) fetchCommitments();
   }, [user.id, fetchCommitments]);
 
-  // ✅ ADDED: Cancel handler
   const handleCancel = async (commitmentId) => {
     setCancelling(commitmentId);
     try {
       await cancelCommitment(commitmentId);
-      // Optimistically update the UI — change status to CANCELLED
       setCommitments((prev) =>
         prev.map((c) => c.id === commitmentId ? { ...c, status: "CANCELLED" } : c)
       );
@@ -371,12 +365,12 @@ export default function MyCommitments() {
 
   const activeCommitments    = commitments.filter((c) => c.status === "PENDING");
   const completedCommitments = commitments.filter((c) => c.status === "COMPLETED");
-  const cancelledCommitments = commitments.filter((c) => c.status === "CANCELLED"); // ✅ ADDED
+  const cancelledCommitments = commitments.filter((c) => c.status === "CANCELLED");
 
   const filtered =
     activeTab === "ACTIVE"    ? activeCommitments
     : activeTab === "PAST"    ? completedCommitments
-    : cancelledCommitments;   // ✅ ADDED: CANCELLED tab
+    : cancelledCommitments;
 
   const livesSaved = completedCommitments.length * 3;
 
@@ -464,7 +458,6 @@ export default function MyCommitments() {
               <p style={{ margin: 0, fontSize: "13px", color: "#64748b", fontWeight: "500" }}>Your commitment history and upcoming visits</p>
             </div>
 
-            {/* ✅ FIXED: Added CANCELLED tab */}
             <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
               <button className="tab-pill" onClick={() => setActiveTab("ACTIVE")}
                 style={{ background: activeTab === "ACTIVE" ? "#fff1f2" : "#f8fafc", borderColor: activeTab === "ACTIVE" ? "#fecdd3" : "#e2e8f0", color: activeTab === "ACTIVE" ? "#DC2626" : "#64748b" }}>
@@ -474,7 +467,6 @@ export default function MyCommitments() {
                 style={{ background: activeTab === "PAST" ? "#ecfdf5" : "#f8fafc", borderColor: activeTab === "PAST" ? "#6ee7b7" : "#e2e8f0", color: activeTab === "PAST" ? "#065f46" : "#64748b" }}>
                 Completed ({completedCommitments.length})
               </button>
-              {/* ✅ ADDED: Cancelled tab so history is never lost */}
               <button className="tab-pill" onClick={() => setActiveTab("CANCELLED")}
                 style={{ background: activeTab === "CANCELLED" ? "#f8fafc" : "#f8fafc", borderColor: activeTab === "CANCELLED" ? "#cbd5e1" : "#e2e8f0", color: activeTab === "CANCELLED" ? "#475569" : "#94a3b8" }}>
                 Cancelled ({cancelledCommitments.length})

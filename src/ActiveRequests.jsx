@@ -243,7 +243,7 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
 
 // ── REQUESTER: single request row ─────────────────────────────────────────────
 function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onStartConfirm, onCancelConfirm }) {
-  const bt         = formatBloodType(request.bloodType);
+  const bt          = formatBloodType(request.bloodType);
   const isFulfilled = request.status === "FULFILLED";
   const statusColor = isFulfilled   ? "#16A34A"
     : request.status === "ACTIVE"   ? "#DC2626"
@@ -283,11 +283,7 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
                 <button onClick={onCancelConfirm} style={{ padding: "6px 12px", borderRadius: "8px", border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#64748b", fontWeight: "800", fontSize: "11px", cursor: "pointer", fontFamily: "inherit" }}>
                   No
                 </button>
-                <button
-                  className="confirm-btn"
-                  disabled={fulfilling}
-                  onClick={() => onFulfill(request.id)}
-                >
+                <button className="confirm-btn" disabled={fulfilling} onClick={() => onFulfill(request.id)}>
                   {fulfilling ? "..." : "✔ Yes, Fulfill"}
                 </button>
               </div>
@@ -315,27 +311,40 @@ export default function ActiveRequests() {
   const location = useLocation();
 
   const [user, setUser] = useState(location.state?.user || {});
-  const [authLoading, setAuthLoading] = useState(!location.state?.user);
+  const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
-    if (!location.state?.user?.id) {
-      const token = localStorage.getItem("token");
-      if (!token) { navigate("/login"); return; }
-      getMe()
-        .then((res) => {
-          if (res.data?.data) setUser(res.data.data);
-          else navigate("/login");
-        })
-        .catch(() => navigate("/login"))
-        .finally(() => setAuthLoading(false));
-    } else {
+    if (location.state?.user?.id) {
+      setUser(location.state.user);
       setAuthLoading(false);
+      return;
     }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    getMe()
+      .then((res) => {
+        if (res.data?.data) {
+          setUser(res.data.data);
+        } else {
+          localStorage.removeItem("token");
+          navigate("/login");
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        navigate("/login");
+      })
+      .finally(() => setAuthLoading(false));
   }, []);
 
   const isDonor = user.role === "DONOR";
   const { eligible, days: daysLeft } = calcEligibility(user.lastDonationDate);
-  
+
   const activeNavColor = isDonor ? "#DC2626" : "#1D4ED8";
   const themeBgLight   = isDonor ? "#fff1f2" : "#eff6ff";
   const themeBorder    = isDonor ? "#fecdd3" : "#bfdbfe";
@@ -355,13 +364,13 @@ export default function ActiveRequests() {
     if (item === "Overview")            navigate("/dashboard",   { state: { user } });
     else if (item === "My Commitments") navigate("/commitments", { state: { user } });
     else if (item === "My Profile")     navigate("/profile",     { state: { user } });
-    // Active Requests does nothing because we are already here
+    // Active Requests does nothing — already here
   };
 
-  const [requests, setRequests] = useState([]);
+  const [requests,        setRequests]        = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
-  const [errorRequests, setErrorRequests] = useState("");
-  const [urgencyFilter, setUrgencyFilter] = useState("ALL");
+  const [errorRequests,   setErrorRequests]   = useState("");
+  const [urgencyFilter,   setUrgencyFilter]   = useState("ALL");
 
   const [committedIds, setCommittedIds] = useState(new Set());
   const [committingId, setCommittingId] = useState(null);
@@ -396,22 +405,23 @@ export default function ActiveRequests() {
     try {
       const res  = await getCommitments({ donorId: user.id });
       const list = res.data?.data ?? res.data ?? [];
-      
-      // ✅ FIX: Only track commitments that are still active or completed
       const activeList = list.filter(c => c.status === "PENDING" || c.status === "COMPLETED");
-      
       setCommittedIds(new Set(activeList.map((c) => c.requestId ?? c.request?.id)));
     } catch {
       // Non-critical
     }
-  }, [isDonor, user.id]);
+  }, [user.id, isDonor]);
 
+  // ✅ FIXED: Only depend on user.id — not on the callback refs.
+  // Putting fetchRequests/fetchMyCommitments in the dep array caused them
+  // to re-run every render because useCallback recreates them on role/bloodType
+  // changes, triggering an infinite polling loop visible in backend logs.
   useEffect(() => {
     if (user.id) {
       fetchRequests();
       fetchMyCommitments();
     }
-  }, [user.id, fetchRequests, fetchMyCommitments]);
+  }, [user.id]); // ✅ user.id only — callbacks are called manually on refresh
 
   const handleCommit = async (requestId) => {
     if (!user.id || !eligible) return;
@@ -428,7 +438,7 @@ export default function ActiveRequests() {
     }
   };
 
-  const handleStartConfirm = (requestId) => setConfirmingId(requestId);
+  const handleStartConfirm  = (requestId) => setConfirmingId(requestId);
   const handleCancelConfirm = () => setConfirmingId(null);
 
   const handleFulfill = async (requestId) => {
@@ -447,7 +457,7 @@ export default function ActiveRequests() {
     }
   };
 
-  const displayedRequests = requests.filter(r => 
+  const displayedRequests = requests.filter(r =>
     urgencyFilter === "ALL" ? true : r.urgency === urgencyFilter
   );
 
@@ -495,8 +505,6 @@ export default function ActiveRequests() {
     );
   }
 
-  if (!user.id) return null;
-
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f8fafc", fontFamily: '"Inter",-apple-system,BlinkMacSystemFont,sans-serif' }}>
       <style>{STYLES}</style>
@@ -519,7 +527,14 @@ export default function ActiveRequests() {
           {navItems.map((item) => {
             const isActive = item === "Active Requests";
             return (
-              <div key={item} className={`nav-item${isActive ? " nav-item-active" : ""}`} onClick={() => handleNavClick(item)} onMouseEnter={() => setHoveredTab(item)} onMouseLeave={() => setHoveredTab(null)} style={{ color: isActive ? activeNavColor : (hoveredTab === item ? "#0f172a" : "#64748b") }}>
+              <div
+                key={item}
+                className={`nav-item${isActive ? " nav-item-active" : ""}`}
+                onClick={() => handleNavClick(item)}
+                onMouseEnter={() => setHoveredTab(item)}
+                onMouseLeave={() => setHoveredTab(null)}
+                style={{ color: isActive ? activeNavColor : (hoveredTab === item ? "#0f172a" : "#64748b") }}
+              >
                 {item}
               </div>
             );
@@ -568,7 +583,7 @@ export default function ActiveRequests() {
               <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                 {isDonor && user.bloodType && (
                   <span style={{ backgroundColor: user.bloodType === "O_NEGATIVE" ? "#f0fdf4" : "#fff1f2", color: user.bloodType === "O_NEGATIVE" ? "#15803d" : "#be123c", padding: "6px 16px", borderRadius: "10px", fontWeight: "900", fontSize: "14px", border: `2px solid ${user.bloodType === "O_NEGATIVE" ? "#86efac" : "#fecdd3"}` }}>
-                    {user.bloodType === "O_NEGATIVE" ? "O− Universal Donor 🌟" : `${formatBloodType(user.bloodType)} filter active`}
+                    {user.bloodType === "O_NEGATIVE" ? "O− Universal Donor" : `${formatBloodType(user.bloodType)} filter active`}
                   </span>
                 )}
                 <button onClick={fetchRequests} style={{ background: "none", border: "2px solid #e2e8f0", borderRadius: "10px", padding: "8px 16px", fontSize: "13px", fontWeight: "700", cursor: "pointer", color: "#64748b", fontFamily: "inherit" }}>
@@ -576,12 +591,11 @@ export default function ActiveRequests() {
                 </button>
               </div>
             </div>
-            
+
             {renderRequestsSection()}
           </SectionCard>
         </div>
 
-        {/* Toast */}
         {toastMessage.text && (
           <div style={{
             position: "fixed", bottom: "40px", left: "50%", transform: "translateX(-50%)",

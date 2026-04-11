@@ -212,8 +212,8 @@ function formatBloodType(raw) {
 
 function getImageSrc(base64Data) {
   if (!base64Data) return null;
-  if (base64Data.startsWith("data:image")) return base64Data; // already a URI
-  return `data:image/jpeg;base64,${base64Data}`; // fallback
+  if (base64Data.startsWith("data:image")) return base64Data;
+  return `data:image/jpeg;base64,${base64Data}`;
 }
 
 export default function Profile() {
@@ -257,19 +257,22 @@ export default function Profile() {
   const fallbackAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.fullName || "U")}&background=${isDonor ? "DC2626" : "1D4ED8"}&color=fff&size=128`;
 
   useEffect(() => {
-    if (!passedUser.id) {
-      const token = localStorage.getItem("token");
-      if (!token) { navigate("/login"); return; }
-      getMe()
-        .then((res) => {
-          if (res.data?.data) setUser(res.data.data);
-          else navigate("/login");
-        })
-        .catch(() => navigate("/login"))
-        .finally(() => setAuthLoading(false));
-    } else {
+    if (passedUser.id) {
+      setUser(passedUser);
       setAuthLoading(false);
+      return;
     }
+
+    const token = localStorage.getItem("token");
+    if (!token) { navigate("/login"); return; }
+
+    getMe()
+      .then((res) => {
+        if (res.data?.data) setUser(res.data.data);
+        else navigate("/login");
+      })
+      .catch(() => navigate("/login"))
+      .finally(() => setAuthLoading(false));
   }, []);
 
   useEffect(() => {
@@ -284,7 +287,6 @@ export default function Profile() {
     setTimeout(() => setToast({ text: "", ok: false, show: false }), 3500);
   };
 
-  // ✅ FIX: Only clear photoPreview if the refreshed user actually has a profilePicture
   const backgroundRefresh = useCallback(async () => {
     if (!user.id) return;
     setRefreshing(true);
@@ -395,9 +397,10 @@ export default function Profile() {
 
   const handleNavClick = (item) => {
     setSidebarOpen(false);
-    if (item === "Overview")            navigate("/dashboard",    { state: { user } });
-    else if (item === "My Commitments") navigate("/commitments",  { state: { user } });
-    else if (item === "Active Requests") navigate("/dashboard",   { state: { user } });
+    if (item === "Overview")             navigate("/dashboard",   { state: { user } });
+    else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
+    else if (item === "Active Requests") navigate("/requests",    { state: { user } });
+    // "My Profile" = already here, do nothing
   };
 
   const inlineMsg = (m) =>
@@ -524,7 +527,6 @@ export default function Profile() {
             <div className="profile-card-inner" style={{ backgroundColor: "#ffffff", padding: "36px", borderRadius: "24px", boxShadow: "0 8px 20px -4px rgba(0,0,0,0.04)", border: "2px solid #eef2ff", textAlign: "center" }}>
 
               <div style={{ position: "relative", display: "inline-block", marginBottom: "20px" }}>
-                {/* ✅ FIX: onError fallback so image never silently breaks */}
                 <img
                   src={avatarSrc}
                   alt="Profile"
@@ -624,12 +626,9 @@ export default function Profile() {
                     <div className="details-value">{formatBloodType(user.bloodType)}</div>
                   </div>
                 )}
-                {user.role === "REQUESTER" && (
-                  <div className="details-item">
-                    <div className="details-label">Hospital / Organization</div>
-                    <div className="details-value">{user.hospitalOrOrg || "—"}</div>
-                  </div>
-                )}
+                {/* ── REMOVED: Hospital / Organization field (user.hospitalOrOrg)       ──
+                    Per SDD, requesters are individuals — hospital association lives on
+                    the request record, not the user record. No hospital_id on users table. */}
 
                 <div className="full-width-item">
                   <div className="details-label">Contact Number</div>

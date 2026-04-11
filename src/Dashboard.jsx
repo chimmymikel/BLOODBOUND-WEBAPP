@@ -268,31 +268,39 @@ function SectionHeader({ title, subtitle, right }) {
 }
 
 // ── DONOR: single request row ─────────────────────────────────────────────────
-function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onCommit, committing }) {
+function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onCommit, committing, hasAnyActiveCommitment }) {
   const bt = formatBloodType(request.bloodType);
   const urgencyColor =
     request.urgency === "CRITICAL" ? "#DC2626"
     : request.urgency === "HIGH"   ? "#EA580C"
     : "#16A34A";
 
-  const isDisabled = alreadyCommitted || committing || !eligible;
+  const isBlockedByOtherCommitment = !alreadyCommitted && hasAnyActiveCommitment;
+  const isDisabled = alreadyCommitted || committing || !eligible || isBlockedByOtherCommitment;
 
   const btnLabel = committing        ? "..."
     : alreadyCommitted               ? "✔ Committed"
     : !eligible                      ? `⏳ ${daysLeft}d left`
+    : isBlockedByOtherCommitment     ? "Unavailable"
     : "Commit to Donate";
 
   const btnStyle = {
     background: alreadyCommitted  ? "linear-gradient(135deg,#ecfdf5,#d1fae5)"
-      : !eligible                 ? "linear-gradient(135deg,#f1f5f9,#e2e8f0)"
+      : (!eligible || isBlockedByOtherCommitment) ? "linear-gradient(135deg,#f1f5f9,#e2e8f0)"
       : "linear-gradient(135deg,#E63946,#DC2626)",
     color: alreadyCommitted       ? "#065f46"
-      : !eligible                 ? "#94a3b8"
+      : (!eligible || isBlockedByOtherCommitment) ? "#94a3b8"
       : "#ffffff",
     border: alreadyCommitted      ? "1.5px solid #6ee7b7"
-      : !eligible                 ? "1.5px solid #cbd5e1"
+      : (!eligible || isBlockedByOtherCommitment) ? "1.5px solid #cbd5e1"
       : "none",
   };
+
+  const hoverTitle = isBlockedByOtherCommitment 
+    ? "You already have committed. Cancel or complete it first." 
+    : (!eligible && !alreadyCommitted) 
+    ? `Wait ${daysLeft} days to be eligible.` 
+    : "";
 
   return (
     <div className="request-row" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -314,7 +322,7 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
           Posted {timeAgo(request.createdAt)}{request.location ? ` · ${request.location}` : ""}
         </div>
       </div>
-      <button className="commit-btn" disabled={isDisabled} onClick={() => !isDisabled && onCommit(request.id)} style={btnStyle}>
+      <button className="commit-btn" disabled={isDisabled} onClick={() => !isDisabled && onCommit(request.id)} style={btnStyle} title={hoverTitle}>
         {btnLabel}
       </button>
     </div>
@@ -323,12 +331,16 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
 
 // ── REQUESTER: single request row ─────────────────────────────────────────────
 function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onStartConfirm, onCancelConfirm }) {
-  const bt         = formatBloodType(request.bloodType);
+  const bt          = formatBloodType(request.bloodType);
   const isFulfilled = request.status === "FULFILLED";
   const statusColor = isFulfilled   ? "#16A34A"
     : request.status === "ACTIVE"   ? "#DC2626"
     : "#64748b";
   const isConfirming = confirmingId === request.id;
+
+  const commitCount = request.commitmentCount || 0;
+  const unitsNeeded = request.units || 1;
+  const hasEnoughDonors = commitCount >= unitsNeeded;
 
   return (
     <div className="request-row" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
@@ -351,30 +363,30 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", flexShrink: 0 }}>
         <div style={{ textAlign: "center", padding: "8px 16px", background: "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: "2px solid #e2e8f0", borderRadius: "10px" }}>
-          <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{request.commitmentCount ?? 0}</div>
-          <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donor{request.commitmentCount !== 1 ? "s" : ""}</div>
+          <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{commitCount}</div>
+          <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donor{commitCount !== 1 ? "s" : ""}</div>
         </div>
 
         {!isFulfilled ? (
           isConfirming ? (
-            // ✅ FIXED: Two-step confirm — no more ugly window.confirm()
             <div style={{ display: "flex", gap: "6px", flexDirection: "column", alignItems: "flex-end" }}>
               <div style={{ fontSize: "11px", color: "#c2410c", fontWeight: "700", textAlign: "right" }}>Are you sure?</div>
               <div style={{ display: "flex", gap: "6px" }}>
                 <button onClick={onCancelConfirm} style={{ padding: "6px 12px", borderRadius: "8px", border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#64748b", fontWeight: "800", fontSize: "11px", cursor: "pointer", fontFamily: "inherit" }}>
                   No
                 </button>
-                <button
-                  className="confirm-btn"
-                  disabled={fulfilling}
-                  onClick={() => onFulfill(request.id)}
-                >
+                <button className="confirm-btn" disabled={fulfilling} onClick={() => onFulfill(request.id)}>
                   {fulfilling ? "..." : "✔ Yes, Fulfill"}
                 </button>
               </div>
             </div>
           ) : (
-            <button className="fulfill-btn" disabled={fulfilling} onClick={() => onStartConfirm(request.id)}>
+            <button 
+              className="fulfill-btn" 
+              disabled={fulfilling || !hasEnoughDonors} 
+              onClick={() => onStartConfirm(request.id)}
+              title={!hasEnoughDonors ? `Wait for ${unitsNeeded} donor(s) to commit before fulfilling` : ""}
+            >
               ✔ Mark Fulfilled
             </button>
           )
@@ -486,31 +498,41 @@ export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  // ✅ FIXED: user is now STATE so it survives a page refresh via getMe()
-  const [user,         setUser]         = useState(location.state?.user || {});
-  const [authLoading,  setAuthLoading]  = useState(!location.state?.user);
+  const [user,        setUser]        = useState(location.state?.user || {});
+  const [authLoading, setAuthLoading] = useState(true);
 
-  // ✅ FIXED: Auth fallback — if page is refreshed and state is lost, re-fetch from JWT
   useEffect(() => {
-    if (!location.state?.user?.id) {
-      const token = localStorage.getItem("token");
-      if (!token) { navigate("/login"); return; }
-      getMe()
-        .then((res) => {
-          if (res.data?.data) setUser(res.data.data);
-          else navigate("/login");
-        })
-        .catch(() => navigate("/login"))
-        .finally(() => setAuthLoading(false));
-    } else {
+    if (location.state?.user?.id) {
+      setUser(location.state.user);
       setAuthLoading(false);
+      return;
     }
+
+    const token = localStorage.getItem("token");
+    if (!token) {
+      navigate("/login");
+      return;
+    }
+
+    getMe()
+      .then((res) => {
+        if (res.data?.data) {
+          setUser(res.data.data);
+        } else {
+          localStorage.removeItem("token");
+          navigate("/login");
+        }
+      })
+      .catch(() => {
+        localStorage.removeItem("token");
+        navigate("/login");
+      })
+      .finally(() => setAuthLoading(false));
   }, []);
 
   const isDonor = user.role === "DONOR";
 
   const [toastMessage, setToastMessage] = useState({ text: "", success: true });
-
   const showToast = (text, success = true) => {
     setToastMessage({ text, success });
     setTimeout(() => setToastMessage({ text: "", success: true }), 4000);
@@ -526,20 +548,20 @@ export default function Dashboard() {
     : ["Overview", "Active Requests", "My Profile"];
 
   const handleNavClick = (item) => {
-    if (item === "Overview")            navigate("/dashboard",   { state: { user } });
-    else if (item === "My Commitments") navigate("/commitments", { state: { user } });
-    else if (item === "Active Requests")navigate("/requests",    { state: { user } }); // 👈 Update this line
-    else if (item === "My Profile")     navigate("/profile",     { state: { user } });
+    if (item === "Overview")             navigate("/dashboard",   { state: { user } });
+    else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
+    else if (item === "Active Requests") navigate("/requests",    { state: { user } });
+    else if (item === "My Profile")      navigate("/profile",     { state: { user } });
   };
 
   const [requests,        setRequests]        = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [errorRequests,   setErrorRequests]   = useState("");
 
-  const [committedIds,  setCommittedIds]  = useState(new Set());
-  const [committingId,  setCommittingId]  = useState(null);
-  const [fulfillingId,  setFulfillingId]  = useState(null);
-  const [confirmingId,  setConfirmingId]  = useState(null); // ✅ ADDED: two-step confirm
+  const [committedIds, setCommittedIds] = useState(new Set());
+  const [committingId, setCommittingId] = useState(null);
+  const [fulfillingId, setFulfillingId] = useState(null);
+  const [confirmingId, setConfirmingId] = useState(null);
 
   const [showModal,   setShowModal]   = useState(false);
   const [submitting,  setSubmitting]  = useState(false);
@@ -552,8 +574,6 @@ export default function Dashboard() {
     try {
       let res;
       if (isDonor) {
-        // ✅ FIXED: O_NEGATIVE donors are universal — they should see ALL requests
-        // Only filter by blood type if the donor is NOT O_NEGATIVE
         const params = { status: "ACTIVE" };
         if (user.bloodType && user.bloodType !== "O_NEGATIVE") {
           params.bloodType = user.bloodType;
@@ -575,28 +595,24 @@ export default function Dashboard() {
     try {
       const res  = await getCommitments({ donorId: user.id });
       const list = res.data?.data ?? res.data ?? [];
-      
-      // ✅ FIX: Only track commitments that are still active or completed
       const activeList = list.filter(c => c.status === "PENDING" || c.status === "COMPLETED");
-      
       setCommittedIds(new Set(activeList.map((c) => c.requestId ?? c.request?.id)));
     } catch {
       // Non-critical
     }
-  }, [isDonor, user.id]);
+  }, [user.id, isDonor]);
 
   useEffect(() => {
     if (user.id) {
       fetchRequests();
       fetchMyCommitments();
     }
-  }, [user.id, fetchRequests, fetchMyCommitments]);
+  }, [user.id]);
 
   const handleCommit = async (requestId) => {
     if (!user.id || !eligible) return;
     setCommittingId(requestId);
     try {
-      // ✅ FIXED: Only send requestId — donorId comes from JWT on the backend
       await createCommitment({ requestId });
       setCommittedIds((prev) => new Set([...prev, requestId]));
       navigate("/commitments", { state: { user } });
@@ -608,8 +624,7 @@ export default function Dashboard() {
     }
   };
 
-  // ✅ FIXED: Two-step fulfill — no more window.confirm()
-  const handleStartConfirm = (requestId) => setConfirmingId(requestId);
+  const handleStartConfirm  = (requestId) => setConfirmingId(requestId);
   const handleCancelConfirm = () => setConfirmingId(null);
 
   const handleFulfill = async (requestId) => {
@@ -662,6 +677,10 @@ export default function Dashboard() {
   const lastDonation     = formatDate(user.lastDonationDate);
   const totalDonations   = user.totalDonations ?? 0;
 
+  const totalRequestsPosted   = requests.length;
+  const fulfilledRequestCount = requests.filter((r) => r.status === "FULFILLED").length;
+  const activeRequestsCount   = requests.filter((r) => r.status === "ACTIVE").length;
+
   const activeNavColor  = isDonor ? "#DC2626"  : "#1D4ED8";
   const accentGrad      = isDonor
     ? "linear-gradient(135deg,#E63946 0%,#DC2626 50%,#B91C1C 100%)"
@@ -679,6 +698,9 @@ export default function Dashboard() {
         ? <EmptyState icon="🏥" title="No active requests right now" body="When blood requests matching your blood type are posted, they'll appear here." />
         : <EmptyState icon="📋" title="No active requests yet" body="Click '+ Post Blood Request' above to create your first request." />;
     }
+
+    const hasAnyActiveCommitment = committedIds.size > 0;
+
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {isDonor
@@ -689,6 +711,7 @@ export default function Dashboard() {
                 eligible={eligible} daysLeft={daysLeft}
                 committing={committingId === r.id}
                 onCommit={handleCommit}
+                hasAnyActiveCommitment={hasAnyActiveCommitment}
               />
             ))
           : requests.map((r) => (
@@ -714,8 +737,6 @@ export default function Dashboard() {
       </div>
     );
   }
-
-  if (!user.id) return null;
 
   return (
     <div style={{ display: "flex", minHeight: "100vh", backgroundColor: "#f8fafc", fontFamily: '"Inter",-apple-system,BlinkMacSystemFont,sans-serif' }}>
@@ -748,7 +769,14 @@ export default function Dashboard() {
           {navItems.map((item) => {
             const isActive = activeTab === item;
             return (
-              <div key={item} className={`nav-item${isActive ? " nav-item-active" : ""}`} onClick={() => handleNavClick(item)} onMouseEnter={() => setHoveredTab(item)} onMouseLeave={() => setHoveredTab(null)} style={{ color: isActive ? activeNavColor : (hoveredTab === item ? "#0f172a" : "#64748b") }}>
+              <div
+                key={item}
+                className={`nav-item${isActive ? " nav-item-active" : ""}`}
+                onClick={() => handleNavClick(item)}
+                onMouseEnter={() => setHoveredTab(item)}
+                onMouseLeave={() => setHoveredTab(null)}
+                style={{ color: isActive ? activeNavColor : (hoveredTab === item ? "#0f172a" : "#64748b") }}
+              >
                 {item}
               </div>
             );
@@ -829,12 +857,12 @@ export default function Dashboard() {
               <SectionCard>
                 <SectionHeader
                   title="Nearby Blood Requests"
-                  subtitle={user.bloodType === "O_NEGATIVE" ? "Showing all requests — you are a universal donor 🌟" : "Active requests matching your blood type"}
+                  subtitle={user.bloodType === "O_NEGATIVE" ? "Showing all requests — you are a universal donor " : "Active requests matching your blood type"}
                   right={
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
                       {user.bloodType && (
                         <span style={{ backgroundColor: user.bloodType === "O_NEGATIVE" ? "#f0fdf4" : "#fff1f2", color: user.bloodType === "O_NEGATIVE" ? "#15803d" : "#be123c", padding: "6px 16px", borderRadius: "10px", fontWeight: "900", fontSize: "14px", border: `2px solid ${user.bloodType === "O_NEGATIVE" ? "#86efac" : "#fecdd3"}` }}>
-                          {user.bloodType === "O_NEGATIVE" ? "O− Universal Donor 🌟" : `${bloodTypeDisplay} filter active`}
+                          {user.bloodType === "O_NEGATIVE" ? "O− Universal Donor" : `${bloodTypeDisplay} filter active`}
                         </span>
                       )}
                       <button onClick={fetchRequests} style={{ background: "none", border: "2px solid #e2e8f0", borderRadius: "10px", padding: "6px 14px", fontSize: "13px", fontWeight: "700", cursor: "pointer", color: "#64748b", fontFamily: "inherit" }}>↻ Refresh</button>
@@ -849,22 +877,56 @@ export default function Dashboard() {
 
         {!isDonor && (
           <>
-            <div className="db-f2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px", marginBottom: "32px" }}>
-              <div className="stat-card">
-                <div style={microLabel}>Hospital / Organization</div>
-                <div style={{ fontSize: "18px", fontWeight: "900", color: "#0f172a", letterSpacing: "-0.01em", lineHeight: "1.3" }}>{user.hospitalOrOrg || "—"}</div>
+            <div className="db-f2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px", marginBottom: "24px" }}>
+              <div className="accent-card" style={{ background: activeRequestsCount > 0 ? "linear-gradient(135deg,#eff6ff,#dbeafe)" : "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: `2.5px solid ${activeRequestsCount > 0 ? "#bfdbfe" : "#e2e8f0"}`, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ ...microLabel, color: activeRequestsCount > 0 ? "#1e40af" : "#64748b" }}>Current Status</div>
+                <div style={{ fontSize: "20px", fontWeight: "900", color: activeRequestsCount > 0 ? "#1d4ed8" : "#0f172a", letterSpacing: "-0.02em", marginBottom: "6px" }}>
+                  {activeRequestsCount > 0 ? `${activeRequestsCount} Active Request${activeRequestsCount !== 1 ? 's' : ''} 📡` : "No Active Requests 💤"}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "500" }}>
+                  {activeRequestsCount > 0 ? "Monitoring incoming donor commitments." : "You currently have no emergency requests."}
+                </div>
               </div>
-              <div className="stat-card">
-                <div style={microLabel}>Contact Number</div>
-                <div style={{ fontSize: "18px", fontWeight: "900", color: "#0f172a" }}>{user.contactNumber || "—"}</div>
+              <div className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={microLabel}>Total Posted</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", letterSpacing: "-0.02em" }}>
+                  {totalRequestsPosted}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", fontWeight: "500" }}>
+                  Lifetime emergency requests
+                </div>
               </div>
-              <div className="stat-card">
-                <div style={microLabel}>Member Since</div>
-                <div style={{ fontSize: "17px", fontWeight: "900", color: "#0f172a" }}>{memberSince || "—"}</div>
+              <div className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={microLabel}>Successfully Fulfilled</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "#16a34a", letterSpacing: "-0.02em" }}>
+                  {fulfilledRequestCount}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", fontWeight: "500" }}>
+                  Requests with enough donors
+                </div>
               </div>
             </div>
 
-            <div className="db-f3 accent-card" style={{ background: accentGrad, marginBottom: "32px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: accentShadow }}>
+            <div className="db-f3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "32px" }}>
+              <div className="stat-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={microLabel}>Contact Number</div>
+                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a" }}>{user.contactNumber || "—"}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Primary phone contact for donors</div>
+                </div>
+                <div style={{ fontSize: "32px" }}>📱</div>
+              </div>
+              <div className="stat-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={microLabel}>Member Since</div>
+                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a" }}>{memberSince || "—"}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Thank you for being part of BloodBound</div>
+                </div>
+                <div style={{ fontSize: "32px" }}>🩸</div>
+              </div>
+            </div>
+
+            <div className="db-f4 accent-card" style={{ background: accentGrad, marginBottom: "32px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: accentShadow }}>
               <div style={{ position: "absolute", width: "200px", height: "200px", borderRadius: "50%", border: "3px solid rgba(255,255,255,0.1)", top: "-80px", right: "100px" }} />
               <div style={{ position: "absolute", width: "120px", height: "120px", borderRadius: "50%", border: "3px solid rgba(255,255,255,0.08)", bottom: "-40px", right: "40px" }} />
               <div style={{ position: "relative", zIndex: 1 }}>
@@ -889,7 +951,6 @@ export default function Dashboard() {
           </>
         )}
 
-        {/* ✅ FIXED: Toast now shows correct icon based on success/error */}
         {toastMessage.text && (
           <div style={{
             position: "fixed", bottom: "40px", left: "50%", transform: "translateX(-50%)",
