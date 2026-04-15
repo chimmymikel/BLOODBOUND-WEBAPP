@@ -303,11 +303,11 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
     : "";
 
   const contactDisplay = alreadyCommitted 
-    ? (request.requester?.contactNumber || request.contactNumber || "Check 'My Commitments'")
+    ? (request.requester?.contactNumber || request.requesterContactNumber || request.contactNumber || "Check 'My Commitments'")
     : "Hidden until committed";
     
   const nameDisplay = alreadyCommitted 
-    ? (request.requester?.fullName || "Requester")
+    ? (request.requester?.fullName || request.requesterName || "Requester")
     : "Anonymous";
 
   return (
@@ -358,21 +358,22 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
 function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onStartConfirm, onCancelConfirm }) {
   const bt          = formatBloodType(request.bloodType);
   const isFulfilled = request.status === "FULFILLED";
-  const statusColor = isFulfilled   ? "#16A34A"
-    : request.status === "ACTIVE"   ? "#DC2626"
-    : "#64748b";
+  const statusColor = isFulfilled   ? "#16A34A" : request.status === "ACTIVE" ? "#DC2626" : "#64748b";
   const isConfirming = confirmingId === request.id;
 
   const commitCount = request.commitmentCount || 0;
   const unitsNeeded = request.units || 1;
   const hasEnoughDonors = commitCount >= unitsNeeded;
+  
+  // ✅ NEW: Extract the donor array sent from the backend
+  const donors = request.committedDonors || [];
 
   return (
-    <div className="request-row" style={{ display: "flex", alignItems: "center", gap: "16px" }}>
-      <div style={{ width: "52px", height: "52px", flexShrink: 0, borderRadius: "14px", background: "linear-gradient(135deg,#eff6ff,#dbeafe)", border: "2px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: "900", color: "#1D4ED8" }}>
+    <div className="request-row" style={{ display: "flex", alignItems: "flex-start", gap: "16px" }}>
+      <div style={{ width: "52px", height: "52px", flexShrink: 0, borderRadius: "14px", background: "linear-gradient(135deg,#eff6ff,#dbeafe)", border: "2px solid #bfdbfe", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "17px", fontWeight: "900", color: "#1D4ED8", marginTop: "4px" }}>
         {bt}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div style={{ flex: 1, minWidth: 0, marginTop: "4px" }}>
         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "4px", flexWrap: "wrap" }}>
           <span style={{ fontSize: "15px", fontWeight: "800", color: "#0f172a" }}>
             {bt} Blood · {request.units} unit{request.units !== 1 ? "s" : ""}
@@ -382,26 +383,48 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
           </span>
         </div>
         <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "600", marginBottom: "4px" }}>📍 {request.hospitalName}</div>
-        {request.notes && <div style={{ fontSize: "13px", color: "#94a3b8", fontWeight: "500", marginBottom: "3px" }}>{request.notes}</div>}
+        {request.notes && <div style={{ fontSize: "13px", color: "#94a3b8", fontWeight: "500", marginBottom: "8px" }}>{request.notes}</div>}
         <div style={{ fontSize: "11px", color: "#cbd5e1", fontWeight: "500" }}>Posted {timeAgo(request.createdAt)}</div>
       </div>
 
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px", flexShrink: 0 }}>
-        <div style={{ textAlign: "center", padding: "8px 16px", background: "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: "2px solid #e2e8f0", borderRadius: "10px" }}>
-          <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{commitCount}</div>
-          <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donor{commitCount !== 1 ? "s" : ""}</div>
-        </div>
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "12px", flexShrink: 0, minWidth: "200px" }}>
+        
+        {/* ✅ NEW: DONOR CONTACT CARDS */}
+        {donors.length > 0 ? (
+          <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "6px" }}>
+            <div style={{ fontSize: "10px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>
+              Committed Donors ({donors.length})
+            </div>
+            {donors.map((donor, idx) => (
+              <div key={idx} style={{ background: "#f8fafc", border: "1.5px solid #e2e8f0", borderRadius: "10px", padding: "8px 12px", display: "flex", flexDirection: "column", gap: "4px" }}>
+                <div style={{ fontSize: "13px", fontWeight: "900", color: "#1D4ED8", display: "flex", alignItems: "center", gap: "5px" }}>
+                  📞 {donor.contactNumber}
+                </div>
+                <div style={{ fontSize: "11px", fontWeight: "600", color: "#475569", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <span>👤 {donor.name}</span>
+                  <span style={{ color: "#DC2626", fontWeight: "900", background: "#fecdd3", padding: "2px 6px", borderRadius: "4px" }}>{formatBloodType(donor.bloodType)}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div style={{ textAlign: "center", padding: "8px 16px", background: "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: "2px solid #e2e8f0", borderRadius: "10px", width: "100%", boxSizing: "border-box" }}>
+            <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{commitCount}</div>
+            <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donors committed</div>
+          </div>
+        )}
 
+        {/* Action Buttons */}
         {!isFulfilled ? (
           isConfirming ? (
-            <div style={{ display: "flex", gap: "6px", flexDirection: "column", alignItems: "flex-end" }}>
-              <div style={{ fontSize: "11px", color: "#c2410c", fontWeight: "700", textAlign: "right" }}>Are you sure?</div>
-              <div style={{ display: "flex", gap: "6px" }}>
-                <button onClick={onCancelConfirm} style={{ padding: "6px 12px", borderRadius: "8px", border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#64748b", fontWeight: "800", fontSize: "11px", cursor: "pointer", fontFamily: "inherit" }}>
+            <div style={{ display: "flex", gap: "6px", flexDirection: "column", alignItems: "flex-end", width: "100%" }}>
+              <div style={{ fontSize: "11px", color: "#DC2626", fontWeight: "800", textAlign: "right" }}>Mark this fulfilled?</div>
+              <div style={{ display: "flex", gap: "6px", width: "100%" }}>
+                <button onClick={onCancelConfirm} style={{ flex: 1, padding: "8px", borderRadius: "8px", border: "1.5px solid #e2e8f0", background: "#f8fafc", color: "#64748b", fontWeight: "800", fontSize: "11px", cursor: "pointer", fontFamily: "inherit" }}>
                   No
                 </button>
-                <button className="confirm-btn" disabled={fulfilling} onClick={() => onFulfill(request.id)}>
-                  {fulfilling ? "..." : "✔ Yes, Fulfill"}
+                <button className="confirm-btn" disabled={fulfilling} onClick={() => onFulfill(request.id)} style={{ flex: 1 }}>
+                  {fulfilling ? "..." : "✔ Yes"}
                 </button>
               </div>
             </div>
@@ -411,12 +434,13 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
               disabled={fulfilling || !hasEnoughDonors} 
               onClick={() => onStartConfirm(request.id)}
               title={!hasEnoughDonors ? `Wait for ${unitsNeeded} donor(s) to commit before fulfilling` : ""}
+              style={{ width: "100%" }}
             >
               ✔ Mark Fulfilled
             </button>
           )
         ) : (
-          <span style={{ fontSize: "11px", fontWeight: "800", color: "#16A34A", padding: "4px 10px", borderRadius: "6px", backgroundColor: "#ecfdf5", border: "1.5px solid #6ee7b7" }}>
+          <span style={{ fontSize: "11px", fontWeight: "800", color: "#16A34A", padding: "6px 12px", borderRadius: "8px", backgroundColor: "#ecfdf5", border: "1.5px solid #6ee7b7", width: "100%", boxSizing: "border-box", textAlign: "center" }}>
             ✔ Fulfilled
           </span>
         )}
