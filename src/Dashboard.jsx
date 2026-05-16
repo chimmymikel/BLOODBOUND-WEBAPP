@@ -175,6 +175,16 @@ const STYLES = `
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatName(name) {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function formatBloodType(raw) {
   if (!raw) return "—";
   return raw.replace("_POSITIVE", "+").replace("_NEGATIVE", "−").replace(/_/g, "");
@@ -307,7 +317,7 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
     : "Hidden until committed";
     
   const nameDisplay = alreadyCommitted 
-    ? (request.requester?.fullName || request.requesterName || "Requester")
+    ? formatName(request.requester?.fullName || request.requesterName) || "Requester"
     : "Anonymous";
 
   return (
@@ -365,7 +375,6 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
   const unitsNeeded = request.units || 1;
   const hasEnoughDonors = commitCount >= unitsNeeded;
   
-  // ✅ NEW: Extract the donor array sent from the backend
   const donors = request.committedDonors || [];
 
   return (
@@ -389,7 +398,7 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "12px", flexShrink: 0, minWidth: "200px" }}>
         
-        {/* ✅ NEW: DONOR CONTACT CARDS */}
+        {/* DONOR CONTACT CARDS */}
         {donors.length > 0 ? (
           <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "6px" }}>
             <div style={{ fontSize: "10px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>
@@ -401,7 +410,7 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
                   📞 {donor.contactNumber}
                 </div>
                 <div style={{ fontSize: "11px", fontWeight: "600", color: "#475569", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>👤 {donor.name}</span>
+                  <span>👤 {formatName(donor.name)}</span>
                   <span style={{ color: "#DC2626", fontWeight: "900", background: "#fecdd3", padding: "2px 6px", borderRadius: "4px" }}>{formatBloodType(donor.bloodType)}</span>
                 </div>
               </div>
@@ -834,7 +843,7 @@ export default function Dashboard() {
         </nav>
 
         <div style={{ position: "relative", zIndex: 1, backgroundColor: "#ffffff", border: "2px solid #f1f5f9", borderRadius: "14px", padding: "14px 16px", marginBottom: "16px", boxShadow: "0 4px 12px -4px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize: "13.5px", fontWeight: "800", color: "#0f172a", marginBottom: "3px" }}>{user.fullName || "User"}</div>
+          <div style={{ fontSize: "13.5px", fontWeight: "800", color: "#0f172a", marginBottom: "3px" }}>{formatName(user.fullName) || "User"}</div>
           <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email || ""}</div>
           <div style={{ display: "inline-flex", marginTop: "8px", fontSize: "10px", fontWeight: "800", padding: "4px 10px", borderRadius: "6px", backgroundColor: isDonor ? "#fff1f2" : "#eff6ff", color: isDonor ? "#be123c" : "#1d4ed8", border: `1px solid ${isDonor ? "#ffe4e6" : "#dbeafe"}`, letterSpacing: "0.06em" }}>
             {user.role || ""}
@@ -849,7 +858,7 @@ export default function Dashboard() {
 
         <header className="db-f1" style={{ marginBottom: "40px" }}>
           <h1 style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-            Welcome, {user.fullName || "User"} 👋
+            Welcome, {formatName(user.fullName) || "User"} 👋
           </h1>
           <p style={{ color: "#64748b", fontSize: "16px", margin: "0", fontWeight: "500" }}>
             {isDonor
