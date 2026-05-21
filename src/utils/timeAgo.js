@@ -1,13 +1,18 @@
 export function timeAgo(dateStr) {
   if (!dateStr) return "Unknown";
 
-  // Kung walay timezone info, i-treat siya as UTC pinaagi sa pag-append og "Z"
   const normalized =
     dateStr.endsWith("Z") || dateStr.includes("+") || /T.*-\d{2}:\d{2}$/.test(dateStr)
       ? dateStr
-      : dateStr + "Z"; // FIXED: Changed from "+08:00" to "Z"
+      : dateStr + "Z";
 
-  const diffMs = Date.now() - new Date(normalized).getTime();
+  const postDate = new Date(normalized);
+  const now = new Date();
+  
+  // I-log nato sa console aron makita nato unsa ang oras
+  console.log("Post Date:", postDate.toLocaleString(), "Now:", now.toLocaleString());
+
+  const diffMs = now.getTime() - postDate.getTime();
   if (isNaN(diffMs)) return "Unknown";
 
   const minutes = Math.floor(diffMs / 60000);
