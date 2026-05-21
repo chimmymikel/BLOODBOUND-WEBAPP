@@ -1,27 +1,27 @@
 export function timeAgo(dateStr) {
-  if (!dateStr) return "Unknown";
+  if (!dateStr) return "Just now";
 
-  const normalized =
-    dateStr.endsWith("Z") || dateStr.includes("+") || /T.*-\d{2}:\d{2}$/.test(dateStr)
-      ? dateStr
-      : dateStr + "Z";
+  // 1. Manually i-parse ang date string aron ma-force ang UTC
+  // Format: 2026-03-30T11:45:03.514077
+  const [datePart, timePart] = dateStr.split('T');
+  const [year, month, day] = datePart.split('-').map(Number);
+  const [hour, min, sec] = timePart.split(':').map(part => parseFloat(part));
 
-  const postDate = new Date(normalized);
+  // I-create ang Date object as UTC
+  const postDate = new Date(Date.UTC(year, month - 1, day, hour, min, sec));
   const now = new Date();
   
-  // I-log nato sa console aron makita nato unsa ang oras
-  console.log("Post Date:", postDate.toLocaleString(), "Now:", now.toLocaleString());
-
+  // 2. Compute the difference in milliseconds
   const diffMs = now.getTime() - postDate.getTime();
-  if (isNaN(diffMs)) return "Unknown";
-
+  
+  // 3. Logic para sa output
   const minutes = Math.floor(diffMs / 60000);
-  if (minutes < 1) return "just now";
+  if (minutes < 1) return "Just now";
   if (minutes < 60) return `${minutes}m ago`;
+  
   const hours = Math.floor(minutes / 60);
   if (hours < 24) return `${hours}h ago`;
+  
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
-  const months = Math.floor(days / 30);
-  return `${months}mo ago`;
+  return `${days}d ago`;
 }
