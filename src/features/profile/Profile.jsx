@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getMe, getProfile, updateProfile, updatePassword, uploadPhoto } from "./api";
+import { getMe, getProfile, updateProfile, updatePassword, uploadPhoto } from "../../services/api";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');

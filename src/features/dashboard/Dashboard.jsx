@@ -8,7 +8,7 @@ import {
   createRequest,
   fulfillRequest,
   getHospitals,
-} from "./api";
+} from "../../services/api";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -51,6 +51,7 @@ const STYLES = `
   .db-f1 { animation: fadeUp .55s cubic-bezier(.16,1,.3,1) both .05s; }
   .db-f2 { animation: fadeUp .55s cubic-bezier(.16,1,.3,1) both .13s; }
   .db-f3 { animation: fadeUp .55s cubic-bezier(.16,1,.3,1) both .21s; }
+  .db-f4 { animation: fadeUp .55s cubic-bezier(.16,1,.3,1) both .29s; }
 
   .wordmark-blood {
     background: linear-gradient(135deg,#E63946 0%,#DC2626 50%,#B91C1C 100%);
@@ -71,6 +72,22 @@ const STYLES = `
     background-color: #ffffff; font-weight: 800; transform: translateX(4px);
     box-shadow: 0 4px 12px rgba(0,0,0,0.05); border: 1px solid #f1f5f9;
   }
+
+  .stat-card {
+    background: #ffffff; border-radius: 20px; border: 2.5px solid #e2e8f0;
+    box-shadow: 0 8px 20px -4px rgba(0,0,0,0.03); padding: 28px;
+    transition: all 0.22s cubic-bezier(.34,1.56,.64,1);
+  }
+  .stat-card:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 16px 32px -6px rgba(0,0,0,0.08); border-color: #cbd5e1;
+  }
+
+  .accent-card {
+    border-radius: 20px; padding: 28px; position: relative;
+    overflow: hidden; transition: all 0.22s cubic-bezier(.34,1.56,.64,1);
+  }
+  .accent-card:hover { transform: translateY(-3px); }
 
   .signout-btn {
     position: relative; background: transparent; border: 2px solid #e2e8f0;
@@ -110,31 +127,6 @@ const STYLES = `
   .commit-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(1.08); }
   .commit-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
-  .fulfill-btn {
-    padding: 8px 16px; border-radius: 9px; border: none;
-    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
-    transition: all 0.18s ease; white-space: nowrap;
-    background: linear-gradient(135deg,#ecfdf5,#d1fae5);
-    color: #065f46; border: 1.5px solid #6ee7b7;
-  }
-  .fulfill-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(0.96); }
-  .fulfill-btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-  .confirm-btn {
-    padding: 8px 16px; border-radius: 9px; border: none;
-    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
-    transition: all 0.18s ease; white-space: nowrap;
-    background: linear-gradient(135deg,#fff7ed,#fed7aa);
-    color: #c2410c; border: 1.5px solid #fdba74;
-  }
-  .confirm-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(0.96); }
-
-  .filter-pill {
-    padding: 8px 18px; border-radius: 10px; font-size: 13px; font-weight: 800;
-    cursor: pointer; transition: all 0.2s ease; border: 2px solid transparent;
-    font-family: inherit;
-  }
-
   .modal-overlay {
     position: fixed; inset: 0; z-index: 1000;
     background: rgba(15,23,42,0.55); backdrop-filter: blur(4px);
@@ -163,12 +155,45 @@ const STYLES = `
     font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
     transition: all 0.18s ease; background: #f8fafc; color: #64748b;
   }
+  .fulfill-btn {
+    padding: 8px 16px; border-radius: 9px; border: none;
+    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+    transition: all 0.18s ease; white-space: nowrap;
+    background: linear-gradient(135deg,#ecfdf5,#d1fae5);
+    color: #065f46; border: 1.5px solid #6ee7b7;
+  }
+  .fulfill-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(0.96); }
+  .fulfill-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+  .confirm-btn {
+    padding: 8px 16px; border-radius: 9px; border: none;
+    font-size: 12px; font-weight: 800; cursor: pointer; font-family: inherit;
+    transition: all 0.18s ease; white-space: nowrap;
+    background: linear-gradient(135deg,#fff7ed,#fed7aa);
+    color: #c2410c; border: 1.5px solid #fdba74;
+  }
+  .confirm-btn:hover:not(:disabled) { transform: translateY(-1px); filter: brightness(0.96); }
 `;
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+function formatName(name) {
+  if (!name) return "";
+  return name
+    .toLowerCase()
+    .split(' ')
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+    .join(' ');
+}
+
 function formatBloodType(raw) {
   if (!raw) return "—";
   return raw.replace("_POSITIVE", "+").replace("_NEGATIVE", "−").replace(/_/g, "");
+}
+function formatDate(isoString) {
+  if (!isoString) return null;
+  return new Date(isoString).toLocaleDateString("en-PH", {
+    year: "numeric", month: "long", day: "numeric",
+  });
 }
 function calcEligibility(lastDonationDate) {
   if (!lastDonationDate) return { eligible: true, days: 0 };
@@ -193,6 +218,11 @@ function timeAgo(isoString) {
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
   return `${Math.floor(diff / 86400)}d ago`;
 }
+
+const microLabel = {
+  display: "block", fontSize: "11px", fontWeight: "800", color: "#64748b",
+  textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "8px",
+};
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────
 function Spinner() {
@@ -242,6 +272,18 @@ function SectionCard({ children, style = {} }) {
   );
 }
 
+function SectionHeader({ title, subtitle, right }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", paddingBottom: "20px", borderBottom: "1.5px solid #f1f5f9" }}>
+      <div>
+        <h3 style={{ margin: "0 0 4px", fontSize: "20px", fontWeight: "900", color: "#0f172a", letterSpacing: "-0.02em" }}>{title}</h3>
+        {subtitle && <p style={{ margin: 0, fontSize: "13px", color: "#64748b", fontWeight: "500" }}>{subtitle}</p>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
 // ── DONOR: single request row ─────────────────────────────────────────────────
 function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onCommit, committing, hasAnyActiveCommitment }) {
   const bt = formatBloodType(request.bloodType);
@@ -282,7 +324,7 @@ function RequestRowDonor({ request, alreadyCommitted, eligible, daysLeft, onComm
     : "Hidden until committed";
     
   const nameDisplay = alreadyCommitted 
-    ? (request.requester?.fullName || request.requesterName || "Requester")
+    ? formatName(request.requester?.fullName || request.requesterName) || "Requester"
     : "Anonymous";
 
   return (
@@ -375,7 +417,7 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
                   📞 {donor.contactNumber}
                 </div>
                 <div style={{ fontSize: "11px", fontWeight: "600", color: "#475569", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-                  <span>👤 {donor.name}</span>
+                  <span>👤 {formatName(donor.name)}</span>
                   <span style={{ color: "#DC2626", fontWeight: "900", background: "#fecdd3", padding: "2px 6px", borderRadius: "4px" }}>{formatBloodType(donor.bloodType)}</span>
                 </div>
               </div>
@@ -384,7 +426,7 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
         ) : (
           <div style={{ textAlign: "center", padding: "8px 16px", background: "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: "2px solid #e2e8f0", borderRadius: "10px", width: "100%", boxSizing: "border-box" }}>
             <div style={{ fontSize: "20px", fontWeight: "900", color: "#0f172a", lineHeight: 1 }}>{commitCount}</div>
-            <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donor{commitCount !== 1 ? "s" : ""}</div>
+            <div style={{ fontSize: "10px", color: "#64748b", fontWeight: "700", marginTop: "2px" }}>donors committed</div>
           </div>
         )}
 
@@ -515,13 +557,13 @@ function PostRequestModal({ onClose, onSubmit, submitting, error }) {
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
-// MAIN ACTIVE REQUESTS COMPONENT
+// MAIN DASHBOARD COMPONENT
 // ══════════════════════════════════════════════════════════════════════════════
-export default function ActiveRequests() {
+export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const [user, setUser] = useState(location.state?.user || {});
+  const [user,        setUser]        = useState(location.state?.user || {});
   const [authLoading, setAuthLoading] = useState(true);
 
   useEffect(() => {
@@ -554,11 +596,6 @@ export default function ActiveRequests() {
   }, []);
 
   const isDonor = user.role === "DONOR";
-  const { eligible, days: daysLeft } = calcEligibility(user.lastDonationDate);
-
-  const activeNavColor = isDonor ? "#DC2626" : "#1D4ED8";
-  const themeBgLight   = isDonor ? "#fff1f2" : "#eff6ff";
-  const themeBorder    = isDonor ? "#fecdd3" : "#bfdbfe";
 
   const [toastMessage, setToastMessage] = useState({ text: "", success: true });
   const showToast = (text, success = true) => {
@@ -566,6 +603,9 @@ export default function ActiveRequests() {
     setTimeout(() => setToastMessage({ text: "", success: true }), 4000);
   };
 
+  const { eligible, days: daysLeft } = calcEligibility(user.lastDonationDate);
+
+  const [activeTab,  setActiveTab]  = useState("Overview");
   const [hoveredTab, setHoveredTab] = useState(null);
 
   const navItems = isDonor
@@ -575,6 +615,7 @@ export default function ActiveRequests() {
   const handleNavClick = (item) => {
     if (item === "Overview")             navigate("/dashboard",   { state: { user } });
     else if (item === "My Commitments")  navigate("/commitments", { state: { user } });
+    else if (item === "Active Requests") navigate("/requests",    { state: { user } });
     else if (item === "Request History") navigate("/history",     { state: { user } });
     else if (item === "My Profile")      navigate("/profile",     { state: { user } });
   };
@@ -582,7 +623,6 @@ export default function ActiveRequests() {
   const [requests,        setRequests]        = useState([]);
   const [loadingRequests, setLoadingRequests] = useState(false);
   const [errorRequests,   setErrorRequests]   = useState("");
-  const [urgencyFilter,   setUrgencyFilter]   = useState("ALL");
 
   const [committedIds, setCommittedIds] = useState(new Set());
   const [committingId, setCommittingId] = useState(null);
@@ -624,6 +664,7 @@ export default function ActiveRequests() {
       const activeList = list.filter(c => c.status === "PENDING" || c.status === "COMPLETED");
       setCommittedIds(new Set(activeList.map((c) => c.requestId ?? c.request?.id)));
     } catch {
+      // Non-critical
     }
   }, [user.id, isDonor]);
 
@@ -685,7 +726,7 @@ export default function ActiveRequests() {
       if (res.data?.success || res.status === 201 || res.status === 200) {
         setShowModal(false);
         setSubmitError("");
-        await fetchRequests(); 
+        await fetchRequests();
         showToast("Request successfully posted! 🩸", true);
       } else {
         setSubmitError(res.data?.message || "Failed to post request.");
@@ -697,17 +738,31 @@ export default function ActiveRequests() {
     }
   };
 
-  const displayedRequests = requests.filter(r =>
-    urgencyFilter === "ALL" ? true : r.urgency === urgencyFilter
-  );
+  const bloodTypeDisplay = formatBloodType(user.bloodType);
+  const memberSince      = formatDate(user.createdAt);
+  const lastDonation     = formatDate(user.lastDonationDate);
+  const totalDonations   = user.totalDonations ?? 0;
+
+  const totalRequestsPosted   = requests.length;
+  const fulfilledRequestCount = requests.filter((r) => r.status === "FULFILLED").length;
+  const activeRequestsCount   = requests.filter((r) => r.status === "ACTIVE").length;
+
+  const activeNavColor  = isDonor ? "#DC2626"  : "#1D4ED8";
+  const accentGrad      = isDonor
+    ? "linear-gradient(135deg,#E63946 0%,#DC2626 50%,#B91C1C 100%)"
+    : "linear-gradient(135deg,#2563EB 0%,#1D4ED8 50%,#1E40AF 100%)";
+  const accentShadow    = isDonor
+    ? "0 12px 32px -4px rgba(220,38,38,.28)"
+    : "0 12px 32px -4px rgba(37,99,235,.28)";
+  const ctaBtnTextColor = isDonor ? "#DC2626" : "#1e40af";
 
   const renderRequestsSection = () => {
     if (loadingRequests) return <Spinner />;
     if (errorRequests)   return <ErrorBanner msg={errorRequests} onRetry={fetchRequests} />;
-    if (displayedRequests.length === 0) {
+    if (requests.length === 0) {
       return isDonor
-        ? <EmptyState icon="🏥" title="No matching requests" body="There are currently no active requests matching your selected filter." />
-        : <EmptyState icon="📋" title="No matching requests" body="You don't have any requests matching your selected filter." />;
+        ? <EmptyState icon="🏥" title="No active requests right now" body="When blood requests matching your blood type are posted, they'll appear here." />
+        : <EmptyState icon="📋" title="No active requests yet" body="Click '+ Post Blood Request' above to create your first request." />;
     }
 
     const hasAnyActiveCommitment = committedIds.size > 0;
@@ -715,7 +770,7 @@ export default function ActiveRequests() {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
         {isDonor
-          ? displayedRequests.map((r) => (
+          ? requests.map((r) => (
               <RequestRowDonor
                 key={r.id} request={r}
                 alreadyCommitted={committedIds.has(r.id)}
@@ -725,7 +780,7 @@ export default function ActiveRequests() {
                 hasAnyActiveCommitment={hasAnyActiveCommitment}
               />
             ))
-          : displayedRequests.map((r) => (
+          : requests.map((r) => (
               <RequestRowRequester
                 key={r.id} request={r}
                 onFulfill={handleFulfill}
@@ -778,7 +833,7 @@ export default function ActiveRequests() {
 
         <nav style={{ display: "flex", flexDirection: "column", gap: "8px", position: "relative", zIndex: 1, flex: 1 }}>
           {navItems.map((item) => {
-            const isActive = item === "Active Requests";
+            const isActive = activeTab === item;
             return (
               <div
                 key={item}
@@ -795,7 +850,7 @@ export default function ActiveRequests() {
         </nav>
 
         <div style={{ position: "relative", zIndex: 1, backgroundColor: "#ffffff", border: "2px solid #f1f5f9", borderRadius: "14px", padding: "14px 16px", marginBottom: "16px", boxShadow: "0 4px 12px -4px rgba(0,0,0,0.04)" }}>
-          <div style={{ fontSize: "13.5px", fontWeight: "800", color: "#0f172a", marginBottom: "3px" }}>{user.fullName || "User"}</div>
+          <div style={{ fontSize: "13.5px", fontWeight: "800", color: "#0f172a", marginBottom: "3px" }}>{formatName(user.fullName) || "User"}</div>
           <div style={{ fontSize: "11px", color: "#64748b", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{user.email || ""}</div>
           <div style={{ display: "inline-flex", marginTop: "8px", fontSize: "10px", fontWeight: "800", padding: "4px 10px", borderRadius: "6px", backgroundColor: isDonor ? "#fff1f2" : "#eff6ff", color: isDonor ? "#be123c" : "#1d4ed8", border: `1px solid ${isDonor ? "#ffe4e6" : "#dbeafe"}`, letterSpacing: "0.06em" }}>
             {user.role || ""}
@@ -808,48 +863,159 @@ export default function ActiveRequests() {
       {/* ══ MAIN CONTENT ══ */}
       <main style={{ marginLeft: "280px", padding: "56px", width: "100%", boxSizing: "border-box", position: "relative" }}>
 
-        <header className="db-f1" style={{ marginBottom: "40px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: "16px" }}>
-          <div>
-            <h1 style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
-              Active Requests 🚨
-            </h1>
-            <p style={{ color: "#64748b", fontSize: "16px", margin: "0", fontWeight: "500" }}>
-              {isDonor
-                ? "Browse emergencies and active requests."
-                : "Manage your active blood postings and check donor commitments."}
-            </p>
-          </div>
+        <header className="db-f1" style={{ marginBottom: "40px" }}>
+          <h1 style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", margin: "0 0 8px", letterSpacing: "-0.03em" }}>
+            Welcome, {formatName(user.fullName) || "User"} 👋
+          </h1>
+          <p style={{ color: "#64748b", fontSize: "16px", margin: "0", fontWeight: "500" }}>
+            {isDonor
+              ? "Track your eligibility and find blood donation requests near you."
+              : "Manage your blood requests and track incoming donor commitments."}
+          </p>
         </header>
 
-        <div className="db-f2">
-          <SectionCard>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "24px", paddingBottom: "20px", borderBottom: "1.5px solid #f1f5f9", flexWrap: "wrap", gap: "16px" }}>
-              <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                {["ALL", "CRITICAL", "HIGH", "STANDARD"].map(u => (
-                  <button key={u} onClick={() => setUrgencyFilter(u)} className="filter-pill" style={{
-                    background: urgencyFilter === u ? themeBgLight : "#f8fafc",
-                    color: urgencyFilter === u ? activeNavColor : "#64748b",
-                    borderColor: urgencyFilter === u ? themeBorder : "transparent"
-                  }}>
-                    {u === "ALL" ? "All Requests" : u}
-                  </button>
-                ))}
+        {isDonor && (
+          <>
+            <div className="db-f2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px", marginBottom: "32px" }}>
+              <div className="accent-card" style={{ background: eligible ? "linear-gradient(135deg,#ecfdf5,#d1fae5)" : "linear-gradient(135deg,#fff1f2,#ffe4e6)", border: `2.5px solid ${eligible ? "#6ee7b7" : "#fecdd3"}`, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.03)" }}>
+                <div style={{ ...microLabel, color: eligible ? "#047857" : "#be123c" }}>Your Status</div>
+                <div style={{ fontSize: "20px", fontWeight: "900", color: eligible ? "#065f46" : "#991b1b", letterSpacing: "-0.02em", marginBottom: "6px" }}>
+                  {eligible ? "Ready to Donate ✔️" : `Eligible in ${daysLeft} days ⏳`}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "500" }}>
+                  {eligible ? "You can commit to active requests." : "56-day waiting period in progress."}
+                </div>
               </div>
-              <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                {isDonor && user.bloodType && (
-                  <span style={{ backgroundColor: user.bloodType === "O_NEGATIVE" ? "#f0fdf4" : "#fff1f2", color: user.bloodType === "O_NEGATIVE" ? "#15803d" : "#be123c", padding: "6px 16px", borderRadius: "10px", fontWeight: "900", fontSize: "14px", border: `2px solid ${user.bloodType === "O_NEGATIVE" ? "#86efac" : "#fecdd3"}` }}>
-                    {user.bloodType === "O_NEGATIVE" ? "O− Universal Donor" : `${formatBloodType(user.bloodType)} filter active`}
-                  </span>
-                )}
-                <button onClick={fetchRequests} style={{ background: "none", border: "2px solid #e2e8f0", borderRadius: "10px", padding: "8px 16px", fontSize: "13px", fontWeight: "700", cursor: "pointer", color: "#64748b", fontFamily: "inherit" }}>
-                  ↻ Refresh
-                </button>
+              <div className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={microLabel}>Your Blood Type</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "#DC2626", letterSpacing: "-0.02em" }}>{bloodTypeDisplay}</div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", fontWeight: "500" }}>Registered at sign-up</div>
+              </div>
+              <div className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={microLabel}>Total Donations</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", letterSpacing: "-0.02em" }}>{totalDonations}</div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", fontWeight: "500" }}>
+                  {totalDonations === 0 ? "No donations yet — commit to your first!" : `Life${totalDonations === 1 ? "" : "s"} impacted so far`}
+                </div>
               </div>
             </div>
 
-            {renderRequestsSection()}
-          </SectionCard>
-        </div>
+            <div className="db-f3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "32px" }}>
+              <div className="stat-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={microLabel}>Last Donation Date</div>
+                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a" }}>{lastDonation || "No donations recorded yet"}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Updated automatically when a request is fulfilled</div>
+                </div>
+                <div style={{ fontSize: "32px" }}>📅</div>
+              </div>
+              <div className="stat-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={microLabel}>Member Since</div>
+                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a" }}>{memberSince || "—"}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Thank you for being part of BloodBound</div>
+                </div>
+                <div style={{ fontSize: "32px" }}>🩸</div>
+              </div>
+            </div>
+
+            <div className="db-f4">
+              <SectionCard>
+                <SectionHeader
+                  title="Nearby Blood Requests"
+                  subtitle={user.bloodType === "O_NEGATIVE" ? "Showing all requests — you are a universal donor " : "Active requests matching your blood type"}
+                  right={
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+                      {user.bloodType && (
+                        <span style={{ backgroundColor: user.bloodType === "O_NEGATIVE" ? "#f0fdf4" : "#fff1f2", color: user.bloodType === "O_NEGATIVE" ? "#15803d" : "#be123c", padding: "6px 16px", borderRadius: "10px", fontWeight: "900", fontSize: "14px", border: `2px solid ${user.bloodType === "O_NEGATIVE" ? "#86efac" : "#fecdd3"}` }}>
+                          {user.bloodType === "O_NEGATIVE" ? "O− Universal Donor" : `${bloodTypeDisplay} filter active`}
+                        </span>
+                      )}
+                      <button onClick={fetchRequests} style={{ background: "none", border: "2px solid #e2e8f0", borderRadius: "10px", padding: "6px 14px", fontSize: "13px", fontWeight: "700", cursor: "pointer", color: "#64748b", fontFamily: "inherit" }}>↻ Refresh</button>
+                    </div>
+                  }
+                />
+                {renderRequestsSection()}
+              </SectionCard>
+            </div>
+          </>
+        )}
+
+        {!isDonor && (
+          <>
+            <div className="db-f2" style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "24px", marginBottom: "24px" }}>
+              <div className="accent-card" style={{ background: activeRequestsCount > 0 ? "linear-gradient(135deg,#eff6ff,#dbeafe)" : "linear-gradient(135deg,#f8fafc,#f1f5f9)", border: `2.5px solid ${activeRequestsCount > 0 ? "#bfdbfe" : "#e2e8f0"}`, boxShadow: "0 8px 20px -4px rgba(0,0,0,0.03)", display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={{ ...microLabel, color: activeRequestsCount > 0 ? "#1e40af" : "#64748b" }}>Current Status</div>
+                <div style={{ fontSize: "20px", fontWeight: "900", color: activeRequestsCount > 0 ? "#1d4ed8" : "#0f172a", letterSpacing: "-0.02em", marginBottom: "6px" }}>
+                  {activeRequestsCount > 0 ? `${activeRequestsCount} Active Request${activeRequestsCount !== 1 ? 's' : ''} 📡` : "No Active Requests 💤"}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", fontWeight: "500" }}>
+                  {activeRequestsCount > 0 ? "Monitoring incoming donor commitments." : "You currently have no emergency requests."}
+                </div>
+              </div>
+              <div className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={microLabel}>Total Posted</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "#0f172a", letterSpacing: "-0.02em" }}>
+                  {totalRequestsPosted}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", fontWeight: "500" }}>
+                  Lifetime emergency requests
+                </div>
+              </div>
+              <div className="stat-card" style={{ display: "flex", flexDirection: "column", justifyContent: "center" }}>
+                <div style={microLabel}>Successfully Fulfilled</div>
+                <div style={{ fontSize: "36px", fontWeight: "900", color: "#16a34a", letterSpacing: "-0.02em" }}>
+                  {fulfilledRequestCount}
+                </div>
+                <div style={{ fontSize: "12px", color: "#64748b", marginTop: "4px", fontWeight: "500" }}>
+                  Requests with enough donors
+                </div>
+              </div>
+            </div>
+
+            <div className="db-f3" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "24px", marginBottom: "32px" }}>
+              <div className="stat-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={microLabel}>Contact Number</div>
+                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a" }}>{user.contactNumber || "—"}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Primary phone contact for donors</div>
+                </div>
+                <div style={{ fontSize: "32px" }}>📱</div>
+              </div>
+              <div className="stat-card" style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={microLabel}>Member Since</div>
+                  <div style={{ fontSize: "17px", fontWeight: "800", color: "#0f172a" }}>{memberSince || "—"}</div>
+                  <div style={{ fontSize: "12px", color: "#94a3b8", marginTop: "4px" }}>Thank you for being part of BloodBound</div>
+                </div>
+                <div style={{ fontSize: "32px" }}>🩸</div>
+              </div>
+            </div>
+
+            <div className="db-f4 accent-card" style={{ background: accentGrad, marginBottom: "32px", display: "flex", alignItems: "center", justifyContent: "space-between", boxShadow: accentShadow }}>
+              <div style={{ position: "absolute", width: "200px", height: "200px", borderRadius: "50%", border: "3px solid rgba(255,255,255,0.1)", top: "-80px", right: "100px" }} />
+              <div style={{ position: "absolute", width: "120px", height: "120px", borderRadius: "50%", border: "3px solid rgba(255,255,255,0.08)", bottom: "-40px", right: "40px" }} />
+              <div style={{ position: "relative", zIndex: 1 }}>
+                <h3 style={{ margin: "0 0 6px", fontSize: "22px", fontWeight: "900", color: "#ffffff", letterSpacing: "-0.02em" }}>Need Blood Urgently?</h3>
+                <p style={{ margin: "0", fontSize: "14px", color: "rgba(255,255,255,0.8)", fontWeight: "500" }}>Post a request and notify available donors in Cebu City.</p>
+              </div>
+              <button className="cta-btn" style={{ color: ctaBtnTextColor, position: "relative", zIndex: 1 }} onClick={() => { setSubmitError(""); setShowModal(true); }}>
+                + Post Blood Request
+              </button>
+            </div>
+
+            <div className="db-f4">
+              <SectionCard>
+                <SectionHeader
+                  title="Your Active Requests"
+                  subtitle="Monitor donor commitments and mark fulfilled"
+                  right={<button onClick={fetchRequests} style={{ background: "none", border: "2px solid #e2e8f0", borderRadius: "10px", padding: "6px 14px", fontSize: "13px", fontWeight: "700", cursor: "pointer", color: "#64748b", fontFamily: "inherit" }}>↻ Refresh</button>}
+                />
+                {renderRequestsSection()}
+              </SectionCard>
+            </div>
+          </>
+        )}
 
         {toastMessage.text && (
           <div style={{

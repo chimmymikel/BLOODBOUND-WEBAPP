@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import {
   getMe,
   getRequests,
-} from "./api";
+} from "../../services/api";
 
 const STYLES = `
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
@@ -87,14 +87,6 @@ function formatDate(isoString) {
   return new Date(isoString).toLocaleDateString("en-PH", {
     year: "numeric", month: "long", day: "numeric",
   });
-}
-function timeAgo(isoString) {
-  if (!isoString) return "";
-  const diff = Math.floor((new Date() - new Date(isoString)) / 1000);
-  if (diff < 60)    return "just now";
-  if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
-  if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
-  return `${Math.floor(diff / 86400)}d ago`;
 }
 
 // ── Shared UI primitives ──────────────────────────────────────────────────────

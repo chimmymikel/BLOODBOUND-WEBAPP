@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
-import { getMe, getCommitments, cancelCommitment } from "./api";
+import { getMe, getCommitments, cancelCommitment } from "../../services/api";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // SDD §7.3 Design System:
