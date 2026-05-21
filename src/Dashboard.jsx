@@ -203,9 +203,16 @@ function calcEligibility(lastDonationDate) {
   const remaining = 56 - diffDays;
   return { eligible: remaining <= 0, days: Math.max(remaining, 0) };
 }
+
+// ── FIXED: timeAgo now handles bare timestamps without timezone info ──────────
 function timeAgo(isoString) {
   if (!isoString) return "";
-  const diff = Math.floor((new Date() - new Date(isoString)) / 1000);
+  // If the string has no timezone info, assume Manila time (UTC+8)
+  const normalized =
+    isoString.endsWith("Z") || isoString.includes("+") || /T.*-\d{2}:\d{2}$/.test(isoString)
+      ? isoString
+      : isoString + "+08:00";
+  const diff = Math.floor((Date.now() - new Date(normalized).getTime()) / 1000);
   if (diff < 60)    return "just now";
   if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;

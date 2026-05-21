@@ -178,9 +178,16 @@ function calcEligibility(lastDonationDate) {
   const remaining = 56 - diffDays;
   return { eligible: remaining <= 0, days: Math.max(remaining, 0) };
 }
+
+// ── FIXED: timeAgo now handles bare timestamps without timezone info ──────────
 function timeAgo(isoString) {
   if (!isoString) return "";
-  const diff = Math.floor((new Date() - new Date(isoString)) / 1000);
+  // If the string has no timezone info, assume Manila time (UTC+8)
+  const normalized =
+    isoString.endsWith("Z") || isoString.includes("+") || /T.*-\d{2}:\d{2}$/.test(isoString)
+      ? isoString
+      : isoString + "+08:00";
+  const diff = Math.floor((Date.now() - new Date(normalized).getTime()) / 1000);
   if (diff < 60)    return "just now";
   if (diff < 3600)  return `${Math.floor(diff / 60)}m ago`;
   if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`;
@@ -333,7 +340,6 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
   const unitsNeeded = request.units || 1;
   const hasEnoughDonors = commitCount >= unitsNeeded;
   
-  // ✅ NEW: Extract the donor array sent from the backend
   const donors = request.committedDonors || [];
 
   return (
@@ -357,7 +363,7 @@ function RequestRowRequester({ request, onFulfill, fulfilling, confirmingId, onS
 
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "12px", flexShrink: 0, minWidth: "200px" }}>
         
-        {/* ✅ NEW: DONOR CONTACT CARDS */}
+        {/* DONOR CONTACT CARDS */}
         {donors.length > 0 ? (
           <div style={{ width: "100%", display: "flex", flexDirection: "column", gap: "6px" }}>
             <div style={{ fontSize: "10px", fontWeight: "800", color: "#64748b", textTransform: "uppercase", letterSpacing: "0.05em", textAlign: "right" }}>
@@ -772,7 +778,7 @@ export default function ActiveRequests() {
 
         <nav style={{ display: "flex", flexDirection: "column", gap: "8px", position: "relative", zIndex: 1, flex: 1 }}>
           {navItems.map((item) => {
-            const isActive = item === "Active Requests"; // <--- FIXED: Hardcoded to "Active Requests"
+            const isActive = item === "Active Requests";
             return (
               <div
                 key={item}
