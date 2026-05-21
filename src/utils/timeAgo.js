@@ -1,11 +1,11 @@
 export function timeAgo(dateStr) {
   if (!dateStr) return "Unknown";
 
-  // If no timezone info, assume Manila time (UTC+8) as fallback
+  // Kung walay timezone info, i-treat siya as UTC pinaagi sa pag-append og "Z"
   const normalized =
     dateStr.endsWith("Z") || dateStr.includes("+") || /T.*-\d{2}:\d{2}$/.test(dateStr)
       ? dateStr
-      : dateStr + "+08:00";
+      : dateStr + "Z"; // FIXED: Changed from "+08:00" to "Z"
 
   const diffMs = Date.now() - new Date(normalized).getTime();
   if (isNaN(diffMs)) return "Unknown";
